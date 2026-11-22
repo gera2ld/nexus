@@ -1,10 +1,24 @@
 # Deploying Nexus
 
 Nexus is one container behind a Caddy reverse proxy that handles TLS. This
-guide was checked on 2026-11-23 with the image built from this repo, Docker
+guide was checked on 2026-11-23 with an image built from this repo, Docker
 29.8 and Caddy 2.
 
-## 1. Build the image
+## 1. Get the image
+
+The image is published on GitHub Container Registry for amd64 and arm64:
+
+```bash
+docker pull ghcr.io/gera2ld/nexus:latest
+```
+
+Each build is also tagged `sha-<commit>`, for pinning a version. Builds are
+made by the Image workflow (**Actions → Image → Run workflow**) and are not
+automatic, so `latest` is the last time it ran. If the package is private,
+the server needs `docker login ghcr.io` with a token that can read packages
+first.
+
+To build it yourself instead:
 
 ```bash
 docker build -t nexus .                                      # for this machine
@@ -14,6 +28,7 @@ docker buildx build --platform linux/amd64 -t nexus --load .  # e.g. on an Apple
 The build stage always runs on the build machine's own platform and Go
 cross-compiles for the target, so building for another architecture is
 fast: only the final stage's one short `RUN` step runs under emulation.
+Use `nexus` instead of the GHCR name below.
 
 The image is about 49 MB: a static binary on Alpine with CA certificates
 and time zone data, running as the `nexus` user (uid 65532). It has a
@@ -46,7 +61,7 @@ A Compose file next to your Caddy setup:
 ```yaml
 services:
   nexus:
-    image: nexus
+    image: ghcr.io/gera2ld/nexus:latest
     restart: unless-stopped
     environment:
       NEXUS_ENC_KEY: ${NEXUS_ENC_KEY}     # from an .env file that isn't committed
@@ -148,6 +163,7 @@ A client's first request without credentials shows as a 401 with `signin`
 
 ## 9. Upgrading
 
-Rebuild the image and recreate the container. The schema is applied from
+`docker compose pull && docker compose up -d` (or rebuild the image and
+recreate the container). The schema is applied from
 the binary on every start, so there are no migrations to run. Take a
 backup first.
