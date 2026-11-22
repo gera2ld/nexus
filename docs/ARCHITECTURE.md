@@ -240,10 +240,18 @@ add about 22 MB to the binary.
     themselves can't be created, replaced, moved or deleted (403), nor can
     anything in a read-only mount. COPY *from* a read-only mount is fine.
     The read-only VFS refuses writes too, as a second layer.
-  - **MOVE between mounts is refused (403).** `x/net/webdav` deletes an
-    existing destination before it renames, and a rename can't cross
-    mounts, so the destination would be lost while the client got an
-    error. Clients fall back to COPY then DELETE. A test covers this.
+  - **MOVE between mounts is done by Nexus as COPY then DELETE.** Clients
+    see the file space as one volume: Finder drag-and-drop and rclone send
+    MOVE between mounts and treat any error as final (neither falls back to
+    copying). `x/net/webdav` can't do it, because its MOVE deletes an
+    existing destination and then renames, and a rename can't cross mounts.
+    Nexus locks the source tree for the duration (423 if another client
+    holds a lock on it), copies, and deletes the source only if the copy
+    succeeded. Not atomic, like every move on S3. Tests cover the
+    destination-overwrite, directory and locked-source cases.
+  - MKCOL on an existing mount answers 405, which rclone reads as "already
+    exists" when it makes parent directories. Other top-level writes are
+    403.
   - `If-Match` and `If-None-Match` on PUT, DELETE and MOVE (it has none).
   - PUT that replaces a file answers 204, not 201.
   - PROPPATCH is accepted and not stored, as rclone does: Windows Explorer
@@ -305,10 +313,28 @@ add about 22 MB to the binary.
   handler and locks, read-only mounts, ETags and `If-Match`, App Password
   `files` scope, PocketBase middleware unbinds; the account page shows the
   files address and mounts; a files section in `probe.sh`.
-- **3c.** macOS Finder, Windows Explorer and rclone as clients. S3 itself is
-  not tested separately: Nexus passes options straight to rclone's s3
-  backend, which rclone maintains and tests (decided 2026-11-23). The first
-  real S3 mount is the check.
+- **3c (done 2026-11-23, apart from Windows).** S3 itself is not tested
+  separately: Nexus passes options straight to rclone's s3 backend, which
+  rclone maintains and tests (decided 2026-11-23). The first real S3 mount
+  is the check. Results, local-disk mounts:
+  - **rclone v1.76.0** (`webdav`, vendor `other`): copy, check, sync with
+    deletes, a second copy transferring nothing, unicode / `%` / `#` /
+    spaces / empty files / empty folders byte-identical, 300 MB up and
+    down, server-side move and directory move within a mount, moves
+    between mounts, read-only and top-level writes refused with Nexus's
+    messages. Found and fixed: moves between mounts failed outright, and
+    MKCOL on an existing mount gave 403 instead of 405.
+  - **macOS WebDAVFS 3.0.0** (what Finder's Connect to Server uses, driven
+    with `mount_webdav`): mounts read-write (class 2), create, append,
+    overwrite, nested folders with accents, 50 MB copy, rename, moves of
+    files and folders between mounts, read-only mount and top level give
+    "Operation not permitted". Notes: `touch` doesn't change modification
+    times (properties are accepted but not stored); extended attributes
+    such as Finder tags are stored by macOS as `._name` files next to the
+    file, as on any non-Apple WebDAV server, and removed with it.
+  - **Windows Explorer:** not tested; needs a Windows machine.
+  - Also found while reading the code: COPY's destination wasn't checked by
+    Nexus (only the read-only VFS refused it); fixed and covered.
 
 ## 8. Security, reliability and operations
 
@@ -392,5 +418,5 @@ scripts/probe.sh end-to-end check of a running server (curl)
 | S3 only, or any rclone backend from day one? | **Proposed:** any backend underneath, UI forms for S3 and local only (§7) |
 | Versioning and conflict behaviour for S3 files | **Proposed:** checked `If-Match`, last writer wins, documented (§7) |
 | Does PocketBase's router pass DAV methods through? | **Resolved** on v0.42.3: yes, once `pbRejectUnknownToken`, `pbCors`, `pbBodyLimit` and `pbLoadAuthToken` are unbound on DAV routes (§3) |
-| Does PocketBase's request log record DAV requests? | Open. The throwaway check found no `_logs` rows within a second; PocketBase may write logs in batches. Nexus writes its own DAV log lines anyway (§8) |
+| Does PocketBase's request log record DAV requests? | **Resolved** 2026-11-23: yes. `_logs` in `auxiliary.db` has method, URL, status and User-Agent for every `/dav` and `/files` request (it writes in batches, which is why the first check saw nothing). Nexus's own log lines still add the user and App Password label (§8) |
 | Do PocketBase backups cover our collections and upload to S3? | Open; check in phase 4 (§8) |

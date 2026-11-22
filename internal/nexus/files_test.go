@@ -201,13 +201,12 @@ func TestFilesReadOnlyAndTopLevel(t *testing.T) {
 			t.Errorf("%s %s %s: %d, want 403", c.method, c.path, c.dest, r.code)
 		}
 	}
-	// MOVE between two writable mounts must not delete the destination.
-	os.WriteFile(filepath.Join(f.scratch, "a.txt"), []byte("keep me"), 0o644)
-	if r := f.req("MOVE", "/docs/a.txt", "", "Destination", f.base+"/scratch/a.txt", "Overwrite", "T"); r.code != http.StatusForbidden {
-		t.Errorf("cross-mount MOVE: %d, want 403", r.code)
+	// Refused by Nexus's own check, not only by the read-only VFS below it.
+	if r := f.req("COPY", "/docs/a.txt", "", "Destination", f.base+"/archive/a.txt"); !strings.Contains(r.body, "read-only") {
+		t.Errorf("COPY into read-only mount: %d %q, want Nexus's read-only message", r.code, r.body)
 	}
-	if b, _ := os.ReadFile(filepath.Join(f.scratch, "a.txt")); string(b) != "keep me" {
-		t.Errorf("cross-mount MOVE destroyed the destination: %q", b)
+	if r := f.req("MKCOL", "/docs/", ""); r.code != http.StatusMethodNotAllowed {
+		t.Errorf("MKCOL on an existing mount: %d, want 405 (already exists)", r.code)
 	}
 	if b, _ := os.ReadFile(filepath.Join(f.arch, "old.txt")); string(b) != "archived" {
 		t.Error("read-only mount was changed")
@@ -271,5 +270,56 @@ func TestFilesMountChangesApply(t *testing.T) {
 	r := f.do("GET", "/api/nexus/me", nil, bearer(f.userTok))
 	if !strings.Contains(r.body, `"mounts":[{"name":"archive","readOnly":true},{"name":"scratch","readOnly":false}]`) {
 		t.Errorf("/me mounts: %s", r.body)
+	}
+}
+
+func TestFilesCrossMountMove(t *testing.T) {
+	f := newFilesEnv(t)
+	read := func(p string) string { b, _ := os.ReadFile(p); return string(b) }
+	exists := func(p string) bool { _, err := os.Stat(p); return err == nil }
+
+	// A file over an existing destination.
+	f.req("PUT", "/docs/a.txt", "new")
+	os.WriteFile(filepath.Join(f.scratch, "a.txt"), []byte("old"), 0o644)
+	if r := f.req("MOVE", "/docs/a.txt", "", "Destination", f.base+"/scratch/a.txt", "Overwrite", "F"); r.code != http.StatusPreconditionFailed {
+		t.Errorf("Overwrite F onto existing: %d, want 412", r.code)
+	}
+	if read(filepath.Join(f.scratch, "a.txt")) != "old" || !exists(filepath.Join(f.docs, "a.txt")) {
+		t.Fatal("refused move changed something")
+	}
+	if r := f.req("MOVE", "/docs/a.txt", "", "Destination", f.base+"/scratch/a.txt"); r.code != http.StatusNoContent {
+		t.Errorf("MOVE onto existing: %d %s, want 204", r.code, r.body)
+	}
+	if read(filepath.Join(f.scratch, "a.txt")) != "new" || exists(filepath.Join(f.docs, "a.txt")) {
+		t.Error("file move: destination not replaced or source left behind")
+	}
+
+	// A directory tree to a new name.
+	f.req("MKCOL", "/docs/dir/", "")
+	f.req("MKCOL", "/docs/dir/sub/", "")
+	f.req("PUT", "/docs/dir/sub/x.txt", "x")
+	if r := f.req("MOVE", "/docs/dir/", "", "Destination", f.base+"/scratch/moved/"); r.code != http.StatusCreated {
+		t.Errorf("dir MOVE: %d %s, want 201", r.code, r.body)
+	}
+	if read(filepath.Join(f.scratch, "moved", "sub", "x.txt")) != "x" || exists(filepath.Join(f.docs, "dir")) {
+		t.Error("dir move: tree not copied or source left behind")
+	}
+
+	// Another client's lock on the source blocks the move entirely.
+	f.req("PUT", "/docs/locked.txt", "mine")
+	if r := f.req("LOCK", "/docs/locked.txt", lockBody); r.code != http.StatusOK {
+		t.Fatalf("LOCK: %d", r.code)
+	}
+	if r := f.req("MOVE", "/docs/locked.txt", "", "Destination", f.base+"/scratch/locked.txt"); r.code != http.StatusLocked {
+		t.Errorf("MOVE of a locked file: %d, want 423", r.code)
+	}
+	if !exists(filepath.Join(f.docs, "locked.txt")) || exists(filepath.Join(f.scratch, "locked.txt")) {
+		t.Error("locked file was moved or copied")
+	}
+
+	// Within one mount MOVE is still a rename.
+	f.req("PUT", "/docs/r.txt", "r")
+	if r := f.req("MOVE", "/docs/r.txt", "", "Destination", f.base+"/docs/r2.txt"); r.code != http.StatusCreated || read(filepath.Join(f.docs, "r2.txt")) != "r" {
+		t.Errorf("same-mount MOVE: %d", r.code)
 	}
 }

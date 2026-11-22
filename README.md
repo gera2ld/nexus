@@ -15,7 +15,8 @@ Phase 1 (DAV library) is done apart from testing with real clients.
 Phase 2 (core service) is done: CalDAV and CardDAV work end to end on
 SQLite, and DAV clients sign in with an App Password created on the account
 page. Phase 3 (file storage) is in progress: WebDAV files work on local disk
-at `/files/{uid}/`; testing with real clients (Finder, Windows Explorer, rclone) is next.
+at `/files/{uid}/`; rclone and the macOS WebDAV client (Finder) are tested; Windows Explorer
+isn't yet.
 
 ```bash
 go test ./...

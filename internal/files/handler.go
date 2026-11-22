@@ -99,24 +99,20 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	base := Prefix + "/" + uid
 	target := strings.TrimPrefix(r.URL.Path, base)
 
-	if writeMethods[r.Method] && r.Method != "COPY" { // COPY only writes its destination
+	// COPY only writes its destination; every other write method writes
+	// the request path.
+	if writeMethods[r.Method] && r.Method != "COPY" {
 		if status, msg := h.writable(ctx, fsys, r.Method, target, true); status != 0 {
 			http.Error(w, msg, status)
 			return
 		}
-		if r.Method == "MOVE" || r.Method == "COPY" {
-			if dst, ok := destination(r, base); ok {
-				if status, msg := h.writable(ctx, fsys, "PUT", dst, false); status != 0 {
-					http.Error(w, msg, status)
-					return
-				}
-				// x/net/webdav deletes an existing destination before
-				// renaming, so a cross-mount MOVE (which can't rename) would
-				// lose it. Refuse up front; clients fall back to COPY+DELETE.
-				if from, _ := split(target); r.Method == "MOVE" && from != mountOf(dst) {
-					http.Error(w, "can't move between mounts; copy and delete instead", http.StatusForbidden)
-					return
-				}
+	}
+	dst, hasDst := "", false
+	if r.Method == "MOVE" || r.Method == "COPY" {
+		if dst, hasDst = destination(r, base); hasDst {
+			if status, msg := h.writable(ctx, fsys, "PUT", dst, false); status != 0 {
+				http.Error(w, msg, status)
+				return
 			}
 		}
 	}
@@ -132,6 +128,10 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	wh := h.forUser(uid)
+	if r.Method == "MOVE" && hasDst && mountOf(target) != mountOf(dst) {
+		h.crossMountMove(w, r, wh, target)
+		return
+	}
 	if r.Method == "PUT" && existed {
 		// x/net/webdav answers 201 even when it replaced a file.
 		w = &overwriteWriter{ResponseWriter: w}
@@ -143,6 +143,13 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // distinguishes the request path from a MOVE/COPY destination.
 func (h *Handler) writable(ctx context.Context, fsys *userFS, method, target string, source bool) (int, string) {
 	mount, inner := split(target)
+	if method == "MKCOL" && mount != "" && inner == "/" {
+		// RFC 4918: MKCOL on an existing collection is 405, which clients
+		// (rclone making parent directories) read as "already there".
+		if _, err := h.m.Get(ctx, fsys.uid, mount); err == nil {
+			return http.StatusMethodNotAllowed, "this mount already exists"
+		}
+	}
 	if mount == "" || inner == "/" && (method != "LOCK" && method != "PROPPATCH" || !source) {
 		// Mounts are made by the admin; clients can't create, replace,
 		// move or delete them.
