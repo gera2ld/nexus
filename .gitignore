@@ -1,0 +1,13 @@
+# build output
+/nexus
+/bin/
+*.test
+
+# runtime data
+pb_data/
+*.db
+*.db-*
+
+# secrets
+.env
+.env.*
