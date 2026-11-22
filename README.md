@@ -11,10 +11,13 @@ for Thunderbird, DAVx⁵ and ordinary WebDAV clients.
 
 ## Status
 
-Phase 1 (DAV library) is done apart from testing with real clients. The
-next phase is the PocketBase core service.
+Phase 1 (DAV library) is done apart from testing with real clients.
+Phase 2 (core service) is in progress: the app skeleton and schema are in;
+`/dav` answers 501 until the SQLite-backed store lands.
 
 ```bash
 go test ./...
+go run ./cmd/nexus superuser upsert admin@example.com <password>
+go run ./cmd/nexus serve                 # admin UI at http://127.0.0.1:8090/_/
 ./scripts/probe.sh http://127.0.0.1:8080   # end-to-end checks
 ```

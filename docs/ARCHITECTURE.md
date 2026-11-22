@@ -51,19 +51,25 @@ the old auth proxy goes away.
 /_/ , /api/*                              PocketBase (admin dashboard, REST API)
 /.well-known/caldav, /.well-known/carddav 301 → /dav/
 /dav/                                     current-user-principal discovery
-/dav/{user}/                              principal (advertises both home sets)
-/dav/{user}/calendars/                    calendar-home-set
-/dav/{user}/calendars/{cal}/{uid}.ics     calendar object
-/dav/{user}/contacts/                     addressbook-home-set
-/dav/{user}/contacts/{book}/{uid}.vcf     address object
-/files/{user}/{mount}/path/...            WebDAV files
+/dav/{uid}/                               principal (advertises both home sets)
+/dav/{uid}/calendars/                     calendar-home-set
+/dav/{uid}/calendars/{cal}/{name}.ics     calendar object
+/dav/{uid}/contacts/                      addressbook-home-set
+/dav/{uid}/contacts/{book}/{name}.vcf     address object
+/files/{uid}/{mount}/path/...             WebDAV files
 ```
 
 - go-webdav works out what a path is from how deep it is under `/dav`:
   principal, then home set, then collection, then object. That fixes this
-  shape. The DAV router sends `/dav/{user}/` to `webdav.ServePrincipal`,
+  shape. The DAV router sends `/dav/{uid}/` to `webdav.ServePrincipal`,
   `calendars/…` to CalDAV and `contacts/…` to CardDAV.
-- The `{user}` segment must equal the signed-in user. Anything else gets a 403
+- `{uid}` is the user's PocketBase record id: 15 lowercase letters and digits
+  that never change. Users sign in with their email, but the email is never
+  part of a URL, so changing it doesn't break any configured client. Clients
+  find these URLs through discovery, so nobody has to type them. (Decided
+  2026-11-22; email URLs were rejected because an email change would break
+  every client, and `@` gets percent-encoded inconsistently.)
+- The `{uid}` segment must equal the signed-in user. Anything else gets a 403
   before any backend code runs.
 - Paths are cleaned (`path.Clean`), and any `..` segment is rejected.
 - **Mounting on PocketBase** (checked 2026-11-22 against PocketBase v0.42.3):
@@ -109,7 +115,7 @@ full on every start with `ImportCollectionsByMarshaledJSON(snapshot, true)`:
 
 | Collection | Key fields | Notes |
 |---|---|---|
-| `users` | built-in auth collection | The username is used in DAV URLs |
+| `users` | built-in auth collection | Email is the DAV login name; the record id is the `{uid}` URL segment |
 | `app_passwords` | user, label, `secret_hash`, scopes (`cal` / `card` / `files`), created, last_used_at, revoked_at | §6 |
 | `calendars` | owner, slug, name, description, color, components (`VEVENT`, `VTODO`), `sync_seq` | Unique per (owner, slug); default calendar supports both |
 | `calendar_objects` | calendar, href, uid, `ics`, etag, component, dtstart, dtend, `seq` | dtstart/dtend are indexed for date-range searches |
@@ -117,7 +123,7 @@ full on every start with `ImportCollectionsByMarshaledJSON(snapshot, true)`:
 | `contacts` | addressbook, href, uid, `vcf`, etag, fn, email, `seq` | |
 | `dav_changes` | collection, href, seq, deleted | Change log and deletion records for sync |
 | `storage_accounts` | name, backend type, `options` (encrypted JSON) | Defined by the admin |
-| `mounts` | user, account, name, remote_path, read_only | `/files/{user}/{name}` |
+| `mounts` | user, account, name, remote_path, read_only | `/files/{uid}/{name}` |
 
 A default calendar ("Personal") and a default address book ("Contacts") are
 created when a user is created.
@@ -152,7 +158,7 @@ created when a user is created.
 
 ## 6. Authentication and authorization
 
-- **DAV and file endpoints** use HTTP Basic: the username plus an App
+- **DAV and file endpoints** use HTTP Basic: the account email plus an App
   Password. The account's own password is never accepted there; it only works
   for the account page and the admin UI.
 - **App Password format:** a random 128-bit secret. Only `sha256(secret)` is
@@ -164,8 +170,8 @@ created when a user is created.
 - **`last_used_at`** is written at most once a minute per password.
 - **Revoked passwords** fail immediately. Validated credentials may be cached
   in memory for a few seconds, and that cache is cleared on revoke.
-- **Isolation:** a user can only reach their own `/dav/{user}` and
-  `/files/{user}` trees. Public sharing and cross-user access control are out
+- **Isolation:** a user can only reach their own `/dav/{uid}` and
+  `/files/{uid}` trees. Public sharing and cross-user access control are out
   of scope.
 
 ## 7. File storage
@@ -175,7 +181,7 @@ created when a user is created.
   in-memory (`webdav.NewMemLS()`). This is the same arrangement as `rclone
   serve webdav`. It gives correct PROPFIND, MOVE and COPY behaviour, plus
   caching and write buffering on top of S3.
-- **Storage Manager:** maps `{user}/{mount}` to a mount, then to a storage
+- **Storage Manager:** maps `{uid}/{mount}` to a mount, then to a storage
   account. It builds the rclone `fs.Fs` from the account's backend type and
   options, and caches the resulting `vfs.VFS`. The cache is cleared when the
   account or mount changes.
@@ -250,19 +256,19 @@ created when a user is created.
 ## 10. Repository layout
 
 ```
+cmd/nexus/       main: PocketBase app; migratecmd registered with automigrate off
 docs/            product and architecture docs (this file)
 internal/dav/    the go-webdav copy and Nexus DAV extensions
+internal/nexus/  wiring: schema on bootstrap, default-collections hook, DAV routes + unbinds
+internal/schema/ embedded collections snapshot (collections.json) + Apply
 scripts/probe.sh end-to-end check of a running server (curl)
 ```
 
-Proposed for phase 2:
+Still to come in phase 2:
 
 ```
-cmd/nexus/       main: PocketBase app + route registration
-internal/auth/   App Password middleware and scopes
 internal/store/  DAV store backed by PocketBase collections (implements the dav backend interfaces)
-internal/files/  Storage Manager and vfs → x/net/webdav adapter
-internal/schema/ embedded collections snapshot (collections.json) + apply-on-start
+internal/auth/   App Password middleware and scopes
 ```
 
 ## 11. Open technical questions

@@ -53,7 +53,7 @@ disagree, the client wins, as long as the spec still allows what we do.
 - Stores and serves iCalendar resources: events (VEVENT) and tasks (VTODO).
   A calendar can hold events, tasks or both.
 - Standard create, read, update and delete, plus discovery: clients find
-  everything from the server URL, a username and a password.
+  everything from the server URL, the account email and an App Password.
 - Reliable incremental sync. Every object has an ETag and every calendar has a
   sync token, so a client only downloads what changed.
 - Clients can rename and recolour calendars.
@@ -119,7 +119,7 @@ There is no web calendar or contacts app in the initial release.
   configuration. Remote object storage needs its own, separately documented
   backup strategy.
 - **Compatibility:** Thunderbird and DAVx⁵ each set up an account from just the
-  server URL, a username and an App Password, with no hand-written paths.
+  server URL, the account email and an App Password, with no hand-written paths.
 
 ## 6. Open product decisions
 
