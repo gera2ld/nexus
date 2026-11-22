@@ -4,6 +4,7 @@ package nexus
 import (
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"ganigeorgiev.com/pocketbase/pocketbase/apis"
@@ -13,6 +14,7 @@ import (
 	"nexus/internal/account"
 	"nexus/internal/auth"
 	"nexus/internal/davserver"
+	"nexus/internal/files"
 	"nexus/internal/schema"
 	"nexus/internal/storage"
 	"nexus/internal/store"
@@ -36,15 +38,15 @@ func Setup(app core.App) error {
 	if err != nil {
 		return err
 	}
-	files := storage.NewManager(app, sealer)
-	files.Bind(app)
+	mounts := storage.NewManager(app, sealer)
+	mounts.Bind(app)
 	app.OnTerminate().BindFunc(func(e *core.TerminateEvent) error {
-		files.Close()
+		mounts.Close()
 		return e.Next()
 	})
 
 	st := store.New(app)
-	dav := newDAV(app, st)
+	dav := newHandler(app, st, mounts)
 
 	app.OnBootstrap().BindFunc(func(e *core.BootstrapEvent) error {
 		if err := e.Next(); err != nil {
@@ -78,11 +80,21 @@ func Setup(app core.App) error {
 	return nil
 }
 
-// newDAV is the authenticated DAV handler: App Password auth around the
-// CalDAV/CardDAV server.
-func newDAV(app core.App, st *store.Store) http.Handler {
+// newHandler is the authenticated handler for /dav and /files: App
+// Password auth (one rate limiter for both) around the CalDAV/CardDAV server
+// and the file server.
+func newHandler(app core.App, st *store.Store, mounts *storage.Manager) http.Handler {
+	cal := davserver.New(st)
+	fh := files.New(mounts, app.Logger())
+	inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, files.Prefix+"/") {
+			fh.ServeHTTP(w, r)
+			return
+		}
+		cal.ServeHTTP(w, r)
+	})
 	limiter := auth.NewLimiter(MaxFailedSignIns, FailedSignInWindow)
-	return auth.NewAppPassword(app, limiter).Wrap(davserver.New(st))
+	return auth.NewAppPassword(app, limiter).Wrap(inner)
 }
 
 // mount registers every Nexus route.
@@ -100,22 +112,28 @@ var davUnbind = []string{
 	apis.DefaultLoadAuthTokenMiddlewareId,      // parses Basic as a PB token
 }
 
-// RegisterRoutes mounts the DAV endpoints on a PocketBase router. dav must
+// RegisterRoutes mounts /dav and /files on a PocketBase router. dav must
 // authenticate requests itself; RegisterRoutes only records the client
 // address (honouring PocketBase's trusted-proxy settings) for rate limiting.
 func RegisterRoutes(r *router.Router[*core.RequestEvent], dav http.Handler) {
-
 	for _, p := range []string{"/.well-known/caldav", "/.well-known/carddav"} {
 		r.Any(p, func(e *core.RequestEvent) error {
 			return e.Redirect(http.StatusMovedPermanently, "/dav/")
 		}).Unbind(davUnbind...)
 	}
 
-	g := r.Group("/dav")
-	g.Unbind(davUnbind...)
-	g.Any("/{path...}", func(e *core.RequestEvent) error {
+	r.Any(files.Prefix, func(e *core.RequestEvent) error {
+		return e.Redirect(http.StatusMovedPermanently, files.Prefix+"/")
+	}).Unbind(davUnbind...)
+
+	serve := func(e *core.RequestEvent) error {
 		r := e.Request.WithContext(auth.WithClientIP(e.Request.Context(), e.RealIP()))
 		dav.ServeHTTP(e.Response, r)
 		return nil
-	})
+	}
+	for _, prefix := range []string{"/dav", files.Prefix} {
+		g := r.Group(prefix)
+		g.Unbind(davUnbind...)
+		g.Any("/{path...}", serve)
+	}
 }

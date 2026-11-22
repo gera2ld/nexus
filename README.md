@@ -12,10 +12,10 @@ for Thunderbird, DAVx⁵ and ordinary WebDAV clients.
 ## Status
 
 Phase 1 (DAV library) is done apart from testing with real clients.
-Phase 2 (core service) is in progress. CalDAV and CardDAV work end to end
-on SQLite, and DAV clients sign in with an App Password created on the
-account page. WebDAV file storage (phase 3) is in progress: storage accounts and mounts
-can be defined in the admin UI, but `/files` isn't served yet.
+Phase 2 (core service) is done: CalDAV and CardDAV work end to end on
+SQLite, and DAV clients sign in with an App Password created on the account
+page. Phase 3 (file storage) is in progress: WebDAV files work on local disk
+at `/files/{uid}/`; testing with real clients (Finder, Windows Explorer, rclone) is next.
 
 ```bash
 go test ./...
@@ -25,8 +25,12 @@ go run ./cmd/nexus serve                 # admin UI at http://127.0.0.1:8090/_/
 # Create a user in the admin UI (there is no public sign-up), then sign in
 # as that user at http://127.0.0.1:8090/account and create an App Password.
 
-# Probe nexus as that user (uid = the user's record id, shown in the admin UI):
+# For files, add a storage account (type local) and a mount for the user in
+# the admin UI, and give the App Password Files access.
+
+# Probe nexus as that user (uid = the user's record id, shown in the admin UI;
+# PROBE_FILES_MOUNT is optional and must name an empty, writable mount):
 PROBE_AUTH='user@example.com:<app-password>' PROBE_UID=<uid> PROBE_CAL=personal \
-  PROBE_BOOK=contacts ./scripts/probe.sh http://127.0.0.1:8090
+  PROBE_BOOK=contacts PROBE_FILES_MOUNT=home ./scripts/probe.sh http://127.0.0.1:8090
 ./scripts/probe.sh http://127.0.0.1:8080   # end-to-end checks
 ```

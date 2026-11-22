@@ -15,6 +15,7 @@ import (
 	"nexus/internal/account"
 	"nexus/internal/auth"
 	"nexus/internal/schema"
+	"nexus/internal/storage"
 	"nexus/internal/store"
 )
 
@@ -33,7 +34,10 @@ func newServer(t *testing.T) *server {
 		t.Fatal(err)
 	}
 	r.Bind(apis.CORS(apis.CORSConfig{AllowOrigins: []string{"*"}})) // as apis.Serve does
-	mount(r, newDAV(app, store.New(app)))
+	mounts := storage.NewManager(app, nil)
+	mounts.Bind(app)
+	t.Cleanup(mounts.Close)
+	mount(r, newHandler(app, store.New(app), mounts))
 	mux, err := r.BuildMux()
 	if err != nil {
 		t.Fatal(err)

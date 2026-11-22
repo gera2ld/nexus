@@ -58,6 +58,8 @@ the old auth proxy goes away.
 /dav/{uid}/calendars/{cal}/{name}.ics     calendar object
 /dav/{uid}/contacts/                      addressbook-home-set
 /dav/{uid}/contacts/{book}/{name}.vcf     address object
+/files, /files/                           301 → /files/{uid}/ (the signed-in user)
+/files/{uid}/                             the user's mounts, as read-only folders
 /files/{uid}/{mount}/path/...             WebDAV files
 ```
 
@@ -226,10 +228,29 @@ PROPFIND, LOCK (423 without the token, success with it), UNLOCK, MOVE, and a
 `..` escape attempt (404). rclone's `local` and `s3` backends plus its VFS
 add about 22 MB to the binary.
 
-- **Handler:** `golang.org/x/net/webdav.Handler` per mount. Its `FileSystem`
-  is an adapter over an rclone `vfs.VFS` (adapted from rclone's own `serve
-  webdav`, MIT), and its `LockSystem` is `webdav.NewMemLS()`, one per mount.
-  Locks are lost on restart, which clients tolerate.
+- **Handler** (`internal/files`): one `golang.org/x/net/webdav.Handler` per
+  user. Its `FileSystem` is a per-user view whose top level is the user's
+  mounts and whose entries below are each mount's rclone `vfs.VFS`
+  (adapted from rclone's own `serve webdav`, MIT). Its `LockSystem` is
+  `webdav.NewMemLS()`, one per user. Locks are lost on restart, which
+  clients tolerate.
+- **What Nexus adds around `x/net/webdav`:**
+  - Write methods (PUT, DELETE, MKCOL, PROPPATCH, MOVE, COPY, LOCK) are
+    checked before the handler runs: the top level and the mounts
+    themselves can't be created, replaced, moved or deleted (403), nor can
+    anything in a read-only mount. COPY *from* a read-only mount is fine.
+    The read-only VFS refuses writes too, as a second layer.
+  - **MOVE between mounts is refused (403).** `x/net/webdav` deletes an
+    existing destination before it renames, and a rename can't cross
+    mounts, so the destination would be lost while the client got an
+    error. Clients fall back to COPY then DELETE. A test covers this.
+  - `If-Match` and `If-None-Match` on PUT, DELETE and MOVE (it has none).
+  - PUT that replaces a file answers 204, not 201.
+  - PROPPATCH is accepted and not stored, as rclone does: Windows Explorer
+    and Finder set their own properties after uploads and treat failures as
+    errors.
+  - Content types come from the backend (S3) or the extension; the default
+    would read the start of every file during PROPFIND.
 - **URLs:** `/files/{uid}/` lists the user's mounts as read-only
   directories; `/files/{uid}/{mount}/…` is the mount. `{uid}` must be the
   signed-in user (403 otherwise), and the App Password needs the `files`
@@ -267,8 +288,9 @@ add about 22 MB to the binary.
   that mount can reach. The VFS path is built only from the cleaned path
   below the mount name, and any `..` element is rejected.
 - **ETags and conflicts:**
-  - The ETag is the backend's MD5 hash where one exists (S3 has it), else size
-    plus modification time.
+  - The ETag is the backend's MD5 hash where it is stored (S3), else
+    modification time plus size, the same formula `x/net/webdav` uses. Local
+    disk uses the latter, since an MD5 there means reading the whole file.
   - `If-Match` is checked before writing. On S3 this check can't be atomic, so
     the documented behaviour is "last writer wins".
   - MOVE and COPY on S3 are copy-then-delete, which isn't atomic either.
@@ -279,11 +301,14 @@ add about 22 MB to the binary.
 - **3a (done).** Storage schema, secret encryption and validation hooks, the
   storage manager with cache invalidation; `local` and `s3` backends. The
   binary grew from 34 MB to 56 MB.
-- **3b.** The `/files` WebDAV handler: mount listing, per-mount handler and
-  locks, read-only mounts, ETags and `If-Match`, App Password `files` scope,
-  PocketBase middleware unbinds; a files section in `probe.sh`.
-- **3c.** S3 end to end against MinIO; macOS Finder, Windows Explorer and
-  rclone as clients.
+- **3b (done).** The `/files` WebDAV handler: mount listing, per-user
+  handler and locks, read-only mounts, ETags and `If-Match`, App Password
+  `files` scope, PocketBase middleware unbinds; the account page shows the
+  files address and mounts; a files section in `probe.sh`.
+- **3c.** macOS Finder, Windows Explorer and rclone as clients. S3 itself is
+  not tested separately: Nexus passes options straight to rclone's s3
+  backend, which rclone maintains and tests (decided 2026-11-23). The first
+  real S3 mount is the check.
 
 ## 8. Security, reliability and operations
 
@@ -353,6 +378,7 @@ internal/davserver/ /dav router: principal, calendars/, contacts/; per-user tree
 internal/auth/   App Password auth for DAV: secrets, scopes, failed-sign-in limiter
 internal/account/ /account page and its /api/nexus API
 internal/storage/ storage accounts and mounts: secret encryption, save checks, rclone VFS manager
+internal/files/  /files WebDAV: per-user view of mounts over x/net/webdav, write checks, conditions
 internal/principal/ authenticated user id in the request context
 scripts/probe.sh end-to-end check of a running server (curl)
 ```

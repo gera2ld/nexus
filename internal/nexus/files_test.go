@@ -1,0 +1,275 @@
+package nexus
+
+import (
+	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"ganigeorgiev.com/pocketbase/pocketbase/core"
+
+	"nexus/internal/schema"
+)
+
+type filesEnv struct {
+	*server
+	uid, base           string
+	docs, arch, scratch string // directories behind the mounts
+	creds               func(*http.Request)
+	userTok             string
+}
+
+func newFilesEnv(t *testing.T) *filesEnv {
+	t.Helper()
+	s := newServer(t)
+	u, tok := s.user("ada@example.com")
+	pw := s.newPassword(tok, "files", "files")
+	f := &filesEnv{server: s, uid: u.Id, base: "/files/" + u.Id, userTok: tok,
+		docs: t.TempDir(), arch: t.TempDir(), scratch: t.TempDir(), creds: basic("ada@example.com", pw.Secret)}
+	os.WriteFile(filepath.Join(f.arch, "old.txt"), []byte("archived"), 0o644)
+
+	acc := core.NewRecord(mustCollection(t, s.app, schema.StorageAccounts))
+	acc.Set("name", "disk")
+	acc.Set("type", "local")
+	if err := s.app.Save(acc); err != nil {
+		t.Fatal(err)
+	}
+	for _, m := range []struct {
+		name, dir string
+		ro        bool
+	}{{"docs", f.docs, false}, {"archive", f.arch, true}, {"scratch", f.scratch, false}} {
+		r := core.NewRecord(mustCollection(t, s.app, schema.Mounts))
+		r.Set("user", u.Id)
+		r.Set("account", acc.Id)
+		r.Set("name", m.name)
+		r.Set("remote_path", m.dir)
+		r.Set("read_only", m.ro)
+		if err := s.app.Save(r); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return f
+}
+
+// req sends method to base+p with the files App Password plus extra headers.
+func (f *filesEnv) req(method, p, body string, hdr ...string) resp {
+	f.t.Helper()
+	return f.do(method, f.base+p, nilIfEmpty(body), func(r *http.Request) {
+		f.creds(r)
+		for i := 0; i+1 < len(hdr); i += 2 {
+			r.Header.Set(hdr[i], hdr[i+1])
+		}
+	})
+}
+
+func nilIfEmpty(s string) any {
+	if s == "" {
+		return nil
+	}
+	return s
+}
+
+func TestFilesDiscoveryAndAccess(t *testing.T) {
+	f := newFilesEnv(t)
+
+	if r := f.do("PROPFIND", "/files", nil, f.creds); r.code != http.StatusMovedPermanently || r.hdr.Get("Location") != "/files/" {
+		t.Errorf("/files: %d -> %q", r.code, r.hdr.Get("Location"))
+	}
+	if r := f.do("PROPFIND", "/files/", nil, f.creds); r.code != http.StatusMovedPermanently || r.hdr.Get("Location") != f.base+"/" {
+		t.Errorf("/files/: %d -> %q", r.code, r.hdr.Get("Location"))
+	}
+	r := f.req("PROPFIND", "/", "", "Depth", "1")
+	if r.code != http.StatusMultiStatus {
+		t.Fatalf("PROPFIND root: %d %s", r.code, r.body)
+	}
+	for _, href := range []string{f.base + "/docs/", f.base + "/archive/"} {
+		if !strings.Contains(r.body, "<D:href>"+href+"</D:href>") {
+			t.Errorf("root listing lacks %s:\n%s", href, r.body)
+		}
+	}
+	if r := f.req("OPTIONS", "/docs/", ""); !strings.Contains(r.hdr.Get("DAV"), "2") {
+		t.Errorf("OPTIONS DAV header %q, want class 2 (locking)", r.hdr.Get("DAV"))
+	}
+
+	// Scope and isolation.
+	calPw := f.newPassword(f.userTok, "cal only", "cal")
+	if r := f.do("PROPFIND", f.base+"/", nil, basic("ada@example.com", calPw.Secret)); r.code != http.StatusForbidden {
+		t.Errorf("cal-only password on /files: %d, want 403", r.code)
+	}
+	_, bobTok := f.user("bob@example.com")
+	bobPw := f.newPassword(bobTok, "bob files", "files")
+	if r := f.do("PROPFIND", f.base+"/docs/", nil, basic("bob@example.com", bobPw.Secret)); r.code != http.StatusForbidden {
+		t.Errorf("Bob on Ada's files: %d, want 403", r.code)
+	}
+	if r := f.do("PROPFIND", f.base+"/docs/", nil, nil); r.code != http.StatusUnauthorized {
+		t.Errorf("no credentials: %d, want 401", r.code)
+	}
+	if r := f.req("GET", "/nope/x.txt", ""); r.code != http.StatusNotFound {
+		t.Errorf("unknown mount: %d, want 404", r.code)
+	}
+	for _, p := range []string{"/docs/../archive/old.txt", "/docs/%2e%2e/%2e%2e/x"} {
+		if r := f.req("GET", p, ""); r.code == http.StatusOK {
+			t.Errorf("GET %s: 200; dot segments must be refused", p)
+		}
+	}
+}
+
+func TestFilesReadWrite(t *testing.T) {
+	f := newFilesEnv(t)
+
+	r := f.req("PUT", "/docs/a.txt", "hello")
+	if r.code != http.StatusCreated || r.hdr.Get("ETag") == "" {
+		t.Fatalf("PUT new: %d etag %q", r.code, r.hdr.Get("ETag"))
+	}
+	if b, _ := os.ReadFile(filepath.Join(f.docs, "a.txt")); string(b) != "hello" {
+		t.Fatalf("on disk: %q", b)
+	}
+	r = f.req("PUT", "/docs/a.txt", "hello again")
+	if r.code != http.StatusNoContent || r.body != "" {
+		t.Errorf("PUT overwrite: %d %q, want 204 and no body", r.code, r.body)
+	}
+	etag := r.hdr.Get("ETag")
+	g := f.req("GET", "/docs/a.txt", "")
+	if g.code != http.StatusOK || g.body != "hello again" || g.hdr.Get("ETag") != etag {
+		t.Errorf("GET: %d %q etag %q, want PUT's %q", g.code, g.body, g.hdr.Get("ETag"), etag)
+	}
+	if p := f.req("PROPFIND", "/docs/a.txt", "", "Depth", "0"); !strings.Contains(p.body, "<D:getetag>"+etag+"</D:getetag>") {
+		t.Errorf("PROPFIND getetag differs from GET's %s:\n%s", etag, p.body)
+	}
+
+	// Conditional writes.
+	if r := f.req("PUT", "/docs/a.txt", "x", "If-Match", `"stale"`); r.code != http.StatusPreconditionFailed {
+		t.Errorf("If-Match stale: %d, want 412", r.code)
+	}
+	if r := f.req("PUT", "/docs/a.txt", "x", "If-None-Match", "*"); r.code != http.StatusPreconditionFailed {
+		t.Errorf("If-None-Match * on existing: %d, want 412", r.code)
+	}
+	if r := f.req("PUT", "/docs/new.txt", "x", "If-None-Match", "*"); r.code != http.StatusCreated {
+		t.Errorf("If-None-Match * on new: %d, want 201", r.code)
+	}
+	if r := f.req("PUT", "/docs/a.txt", "v3", "If-Match", etag); r.code != http.StatusNoContent {
+		t.Errorf("If-Match current: %d, want 204", r.code)
+	}
+	if r := f.req("DELETE", "/docs/missing.txt", "", "If-Match", "*"); r.code != http.StatusPreconditionFailed {
+		t.Errorf("DELETE If-Match * on missing: %d, want 412", r.code)
+	}
+
+	// Directories, move, copy, delete.
+	if r := f.req("MKCOL", "/docs/sub/", ""); r.code != http.StatusCreated {
+		t.Errorf("MKCOL: %d", r.code)
+	}
+	if r := f.req("MOVE", "/docs/a.txt", "", "Destination", "http://example.com"+f.base+"/docs/sub/b.txt"); r.code != http.StatusCreated {
+		t.Errorf("MOVE: %d %s", r.code, r.body)
+	}
+	if _, err := os.Stat(filepath.Join(f.docs, "sub", "b.txt")); err != nil {
+		t.Errorf("moved file missing: %v", err)
+	}
+	if r := f.req("COPY", "/archive/old.txt", "", "Destination", f.base+"/docs/old.txt"); r.code != http.StatusCreated {
+		t.Errorf("COPY from read-only mount: %d", r.code)
+	}
+	if r := f.req("DELETE", "/docs/sub/", ""); r.code != http.StatusNoContent {
+		t.Errorf("DELETE dir: %d", r.code)
+	}
+}
+
+func TestFilesReadOnlyAndTopLevel(t *testing.T) {
+	f := newFilesEnv(t)
+	f.req("PUT", "/docs/a.txt", "hello")
+
+	if r := f.req("GET", "/archive/old.txt", ""); r.code != http.StatusOK || r.body != "archived" {
+		t.Errorf("GET read-only: %d %q", r.code, r.body)
+	}
+	for _, c := range []struct{ method, path, dest string }{
+		{"PUT", "/archive/new.txt", ""},
+		{"DELETE", "/archive/old.txt", ""},
+		{"MKCOL", "/archive/d/", ""},
+		{"LOCK", "/archive/old.txt", ""},
+		{"MOVE", "/archive/old.txt", "/docs/old.txt"},
+		{"MOVE", "/docs/a.txt", "/archive/a.txt"},
+		{"COPY", "/docs/a.txt", "/archive/a.txt"},
+		{"MKCOL", "/newmount/", ""},
+		{"PUT", "/top.txt", ""},
+		{"DELETE", "/docs/", ""},
+		{"MOVE", "/docs/", "/docs2/"},
+	} {
+		var hdr []string
+		if c.dest != "" {
+			hdr = []string{"Destination", f.base + c.dest}
+		}
+		if r := f.req(c.method, c.path, "x", hdr...); r.code != http.StatusForbidden {
+			t.Errorf("%s %s %s: %d, want 403", c.method, c.path, c.dest, r.code)
+		}
+	}
+	// MOVE between two writable mounts must not delete the destination.
+	os.WriteFile(filepath.Join(f.scratch, "a.txt"), []byte("keep me"), 0o644)
+	if r := f.req("MOVE", "/docs/a.txt", "", "Destination", f.base+"/scratch/a.txt", "Overwrite", "T"); r.code != http.StatusForbidden {
+		t.Errorf("cross-mount MOVE: %d, want 403", r.code)
+	}
+	if b, _ := os.ReadFile(filepath.Join(f.scratch, "a.txt")); string(b) != "keep me" {
+		t.Errorf("cross-mount MOVE destroyed the destination: %q", b)
+	}
+	if b, _ := os.ReadFile(filepath.Join(f.arch, "old.txt")); string(b) != "archived" {
+		t.Error("read-only mount was changed")
+	}
+	if _, err := os.Stat(filepath.Join(f.docs, "a.txt")); err != nil {
+		t.Error("source of a refused MOVE is gone")
+	}
+}
+
+const lockBody = `<?xml version="1.0"?><D:lockinfo xmlns:D="DAV:"><D:lockscope><D:exclusive/></D:lockscope><D:locktype><D:write/></D:locktype><D:owner>test</D:owner></D:lockinfo>`
+
+func TestFilesLocking(t *testing.T) {
+	f := newFilesEnv(t)
+	f.req("PUT", "/docs/a.txt", "v1")
+
+	r := f.req("LOCK", "/docs/a.txt", lockBody, "Timeout", "Second-60")
+	tok := r.hdr.Get("Lock-Token")
+	if r.code != http.StatusOK || tok == "" {
+		t.Fatalf("LOCK: %d token %q", r.code, tok)
+	}
+	if r := f.req("PUT", "/docs/a.txt", "v2"); r.code != http.StatusLocked {
+		t.Errorf("PUT without token: %d, want 423", r.code)
+	}
+	if r := f.req("PUT", "/docs/a.txt", "v2", "If", "("+tok+")"); r.code != http.StatusNoContent {
+		t.Errorf("PUT with token: %d, want 204", r.code)
+	}
+	if r := f.req("UNLOCK", "/docs/a.txt", "", "Lock-Token", tok); r.code != http.StatusNoContent {
+		t.Errorf("UNLOCK: %d", r.code)
+	}
+	if r := f.req("PUT", "/docs/a.txt", "v3"); r.code != http.StatusNoContent {
+		t.Errorf("PUT after UNLOCK: %d", r.code)
+	}
+	// Locking a new name creates an empty file (lock-null), as Finder expects.
+	if r := f.req("LOCK", "/docs/fresh.txt", lockBody); r.code != http.StatusCreated {
+		t.Errorf("LOCK new name: %d, want 201", r.code)
+	}
+}
+
+func TestFilesMountChangesApply(t *testing.T) {
+	f := newFilesEnv(t)
+	if r := f.req("PUT", "/docs/a.txt", "x"); r.code != http.StatusCreated {
+		t.Fatal(r.code)
+	}
+	m, err := f.app.FindFirstRecordByFilter(schema.Mounts, "name = 'docs'")
+	if err != nil {
+		t.Fatal(err)
+	}
+	m.Set("read_only", true)
+	if err := f.app.Save(m); err != nil {
+		t.Fatal(err)
+	}
+	if r := f.req("PUT", "/docs/b.txt", "x"); r.code != http.StatusForbidden {
+		t.Errorf("after making docs read-only: %d, want 403", r.code)
+	}
+	if err := f.app.Delete(m); err != nil {
+		t.Fatal(err)
+	}
+	if r := f.req("GET", "/docs/a.txt", ""); r.code != http.StatusNotFound {
+		t.Errorf("after deleting the mount: %d, want 404", r.code)
+	}
+	r := f.do("GET", "/api/nexus/me", nil, bearer(f.userTok))
+	if !strings.Contains(r.body, `"mounts":[{"name":"archive","readOnly":true},{"name":"scratch","readOnly":false}]`) {
+		t.Errorf("/me mounts: %s", r.body)
+	}
+}

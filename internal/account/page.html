@@ -93,6 +93,18 @@
     </section>
 
     <section>
+      <h2>Files</h2>
+      <div id="files-none" class="muted">No storage has been assigned to you yet.</div>
+      <div id="files-some" class="hidden">
+        <dl>
+          <dt>WebDAV address</dt><dd><code id="files-url"></code></dd>
+          <dt>Folders</dt><dd id="files-mounts"></dd>
+        </dl>
+        <p class="muted" style="margin-top:12px">Connect with Finder (Go › Connect to Server), Windows Explorer (Map network drive) or any WebDAV app, using your email and an App Password with Files access.</p>
+      </div>
+    </section>
+
+    <section>
       <h2>New App Password</h2>
       <p class="muted">Create one per device or app, so you can revoke it on its own.</p>
       <form id="create-form">
@@ -167,6 +179,18 @@
     return api("GET", "/api/nexus/me").then(function (me) {
       $("server").textContent = me.server + "/";
       $("username").textContent = me.email;
+      var mounts = me.mounts || [];
+      $("files-none").classList.toggle("hidden", mounts.length > 0);
+      $("files-some").classList.toggle("hidden", mounts.length === 0);
+      $("files-url").textContent = me.server + "/files/" + me.id + "/";
+      var list = $("files-mounts");
+      list.textContent = "";
+      mounts.forEach(function (m) {
+        var t = document.createElement("span");
+        t.className = "tag";
+        t.textContent = m.name + (m.readOnly ? " (read-only)" : "");
+        list.appendChild(t);
+      });
       show(true);
       return refresh();
     });

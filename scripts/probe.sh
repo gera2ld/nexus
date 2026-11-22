@@ -3,7 +3,8 @@
 # incremental sync-collection, PROPPATCH. Expects a fresh user.
 # Usage: ./probe.sh [base-url]
 # Defaults: alice:test on :8080; for nexus set PROBE_AUTH, PROBE_UID, PROBE_CAL
-# and PROBE_BOOK (see README).
+# and PROBE_BOOK (see README). Set PROBE_FILES_MOUNT to the name of an empty,
+# writable mount to also check /files (the App Password needs Files access).
 set -u
 BASE=${1:-http://127.0.0.1:8080}
 AUTH=${PROBE_AUTH:-alice:test}
@@ -64,6 +65,26 @@ out=$(req -X REPORT -H 'Depth: 0' $BASE$BOOK --data "$(sync_body "$B0")")
 check "address book incremental sync sees c1.vcf" "$out" "${BOOK}c1.vcf"
 out=$(req -X PROPFIND -H 'Depth: 0' $BASE$BOOK --data "$COLLPROPS")
 check "address book has getctag" "$out" "<getctag xmlns=\"http://calendarserver.org/ns/\">https://nexus/ns/sync/1</getctag>"
+
+if [ -n "${PROBE_FILES_MOUNT:-}" ]; then
+  F=$BASE/files/$PUID/$PROBE_FILES_MOUNT
+  code() { curl -s -o /dev/null -w '%{http_code}' -u $AUTH "$@"; }
+  check "files: /files/ redirects to own space" "$(curl -s -o /dev/null -w '%{http_code} %header{location}' -u $AUTH -X PROPFIND $BASE/files/)" "301 /files/$PUID/"
+  out=$(req -X PROPFIND -H 'Depth: 1' $BASE/files/$PUID/)
+  check "files: root lists the mount" "$out" "/files/$PUID/$PROBE_FILES_MOUNT/"
+  check "files: MKCOL" "$(code -X MKCOL $F/probe/)" 201
+  check "files: PUT new -> 201" "$(code -T "$0" $F/probe/p.sh)" 201
+  check "files: PUT overwrite -> 204" "$(code -T "$0" $F/probe/p.sh)" 204
+  check "files: GET returns the content" "$(curl -s -u $AUTH $F/probe/p.sh | head -1)" "#!/usr/bin/env bash"
+  check "files: If-Match stale -> 412" "$(code -T "$0" -H 'If-Match: "nope"' $F/probe/p.sh)" 412
+  LT=$(curl -s -D - -o /dev/null -u $AUTH -X LOCK -H 'Timeout: Second-60' --data '<?xml version="1.0"?><D:lockinfo xmlns:D="DAV:"><D:lockscope><D:exclusive/></D:lockscope><D:locktype><D:write/></D:locktype></D:lockinfo>' $F/probe/p.sh | tr -d '\r' | awk 'tolower($1)=="lock-token:"{print $2}')
+  check "files: LOCK returns a token" "$LT" "<"
+  check "files: PUT on locked file -> 423" "$(code -T "$0" $F/probe/p.sh)" 423
+  check "files: UNLOCK" "$(code -X UNLOCK -H "Lock-Token: $LT" $F/probe/p.sh)" 204
+  check "files: MOVE" "$(code -X MOVE -H "Destination: $F/probe/q.sh" $F/probe/p.sh)" 201
+  check "files: top level is read-only" "$(code -X MKCOL $BASE/files/$PUID/new/)" 403
+  check "files: DELETE dir" "$(code -X DELETE $F/probe/)" 204
+fi
 
 echo "---- $pass passed, $fail failed"
 [ $fail -eq 0 ]

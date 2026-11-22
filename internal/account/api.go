@@ -68,10 +68,23 @@ func Register(r *router.Router[*core.RequestEvent]) {
 }
 
 func me(e *core.RequestEvent) error {
-	return e.JSON(http.StatusOK, map[string]string{
+	recs, err := e.App.FindRecordsByFilter(schema.Mounts, "user = {:u}", "name", 0, 0, dbx.Params{"u": e.Auth.Id})
+	if err != nil {
+		return e.InternalServerError("", err)
+	}
+	type mount struct {
+		Name     string `json:"name"`
+		ReadOnly bool   `json:"readOnly"`
+	}
+	mounts := make([]mount, 0, len(recs))
+	for _, r := range recs {
+		mounts = append(mounts, mount{r.GetString("name"), r.GetBool("read_only")})
+	}
+	return e.JSON(http.StatusOK, map[string]any{
 		"id":     e.Auth.Id,
 		"email":  e.Auth.Email(),
 		"server": requestOrigin(e.Request),
+		"mounts": mounts,
 	})
 }
 
