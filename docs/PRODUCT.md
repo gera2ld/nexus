@@ -88,7 +88,7 @@ Nexus offers a minimal web interface for:
 
 - **Users:** create, disable and delete them, and reset their passwords.
 - **Calendars and address books:** create, rename and delete them for any
-  user. Clients can't create collections themselves yet.
+  user. Clients can create them too, but only the admin deletes them.
 - **Storage:** configure storage accounts (S3 credentials, local paths) and
   mount them into a user's file space.
 - **App Passwords:** generate and revoke one password per device or app. Each

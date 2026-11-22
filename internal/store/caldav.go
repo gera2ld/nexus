@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"net/http"
+	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -14,6 +16,9 @@ import (
 
 	"nexus/internal/dav/caldav"
 )
+
+// colorRE is the calendars.color field pattern.
+var colorRE = regexp.MustCompile(`^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$`)
 
 // CalDAV is the caldav.Backend (plus SyncBackend and UpdateBackend).
 type CalDAV struct{ s *Store }
@@ -80,7 +85,9 @@ func (b *CalDAV) GetCalendar(ctx context.Context, p string) (*caldav.Calendar, e
 	return &cal, nil
 }
 
-// CreateCalendar handles extended MKCOL. Slugs come from the URL.
+// CreateCalendar handles MKCALENDAR and extended MKCOL. Slugs come from the
+// URL. Components the schema can't store are dropped; a colour that isn't
+// #rrggbb or #rrggbbaa is ignored rather than failing the request.
 func (b *CalDAV) CreateCalendar(ctx context.Context, c *caldav.Calendar) error {
 	uid, t, err := parse(ctx, calKind, c.Path)
 	if err != nil {
@@ -101,11 +108,22 @@ func (b *CalDAV) CreateCalendar(ctx context.Context, c *caldav.Calendar) error {
 	rec.Set("slug", t.slug)
 	rec.Set("name", c.Name)
 	rec.Set("description", c.Description)
-	comps := c.SupportedComponentSet
-	if len(comps) == 0 {
-		comps = []string{ical.CompEvent, ical.CompToDo}
+	comps := []string{ical.CompEvent, ical.CompToDo}
+	if len(c.SupportedComponentSet) > 0 {
+		comps = nil
+		for _, comp := range c.SupportedComponentSet {
+			if comp = strings.ToUpper(comp); (comp == ical.CompEvent || comp == ical.CompToDo) && !slices.Contains(comps, comp) {
+				comps = append(comps, comp)
+			}
+		}
+		if len(comps) == 0 {
+			return httpErr(http.StatusForbidden, "store: calendars hold only events and tasks")
+		}
 	}
 	rec.Set("components", comps)
+	if colorRE.MatchString(c.Color) {
+		rec.Set("color", c.Color)
+	}
 	if err := b.s.app.Save(rec); err != nil {
 		return httpErr(http.StatusBadRequest, "store: create calendar: %v", err)
 	}

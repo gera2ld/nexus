@@ -74,6 +74,12 @@ type Backend interface {
 	Move(r *http.Request, dest *Href, overwrite bool) (created bool, err error)
 }
 
+// MkcalendarBackend is implemented by backends that accept MKCALENDAR
+// (RFC 4791 §5.3.1).
+type MkcalendarBackend interface {
+	Mkcalendar(r *http.Request) error
+}
+
 type Handler struct {
 	Backend Backend
 }
@@ -102,6 +108,16 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			err = h.handleProppatch(w, r)
 		case "MKCOL":
 			err = h.Backend.Mkcol(r)
+			if err == nil {
+				w.WriteHeader(http.StatusCreated)
+			}
+		case "MKCALENDAR":
+			mb, ok := h.Backend.(MkcalendarBackend)
+			if !ok {
+				err = HTTPErrorf(http.StatusMethodNotAllowed, "webdav: unsupported method")
+				break
+			}
+			err = mb.Mkcalendar(r)
 			if err == nil {
 				w.WriteHeader(http.StatusCreated)
 			}

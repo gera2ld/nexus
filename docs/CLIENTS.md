@@ -57,8 +57,13 @@ read-only mount and the top level give "Operation not permitted".
 
 ## Known limits
 
-- **No MKCALENDAR:** clients can't create calendars or address books. Each
-  user gets a default calendar and address book; add more in the admin UI.
+- **Creating collections:** clients can create calendars (MKCALENDAR or
+  extended MKCOL) and address books (extended MKCOL), with a name,
+  description, colour and component set. This is covered by tests but no
+  real client has done it yet. Calendars hold events and tasks only; a
+  request for journals alone is refused.
+- **Deleting collections** from a client is refused (403); the admin UI
+  deletes a calendar or address book and everything in it.
 - **S3** isn't tested separately: Nexus passes options straight to rclone's
   s3 backend, which rclone maintains and tests.
 

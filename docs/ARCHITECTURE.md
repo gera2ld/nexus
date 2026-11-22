@@ -384,9 +384,11 @@ rclone maintains and tests, so the first real S3 mount is the check.
 - **Why not write our own:** about 2–3k lines and weeks of client-quirk
   debugging that upstream has already done. Recurring-event matching alone is
   a significant job.
-- **Still missing:** MKCALENDAR. Extended MKCOL creates calendars and address
-  books, but that hasn't been tried with real clients; the admin UI is the
-  supported way to create them.
+- **Creating collections:** MKCALENDAR (added by us) and extended MKCOL
+  create calendars and address books in the user's home, keeping the
+  name, description, colour and component set. Slugs come from the URL,
+  so they allow upper case and dots (Apple-style UUIDs). Clients can't
+  delete collections; the admin UI does.
 
 ## 10. Repository layout
 

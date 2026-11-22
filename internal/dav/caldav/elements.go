@@ -3,6 +3,7 @@ package caldav
 import (
 	"encoding/xml"
 	"fmt"
+	"strings"
 	"time"
 
 	"nexus/internal/dav/internal"
@@ -250,8 +251,33 @@ func (r *reportReq) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
 }
 
 type mkcolReq struct {
-	XMLName      xml.Name              `xml:"DAV: mkcol"`
-	ResourceType internal.ResourceType `xml:"set>prop>resourcetype"`
-	DisplayName  string                `xml:"set>prop>displayname"`
-	// TODO this could theoretically contain all addressbook properties?
+	XMLName xml.Name         `xml:"DAV: mkcol"`
+	Props   newCalendarProps `xml:"set>prop"`
+}
+
+// https://datatracker.ietf.org/doc/html/rfc4791#section-5.3.1
+type mkcalendarReq struct {
+	XMLName xml.Name         `xml:"urn:ietf:params:xml:ns:caldav mkcalendar"`
+	Props   newCalendarProps `xml:"set>prop"`
+}
+
+// newCalendarProps are the properties a client may set when it creates a
+// calendar with MKCALENDAR or extended MKCOL (RFC 5689).
+type newCalendarProps struct {
+	ResourceType internal.ResourceType          `xml:"DAV: resourcetype"`
+	DisplayName  string                         `xml:"DAV: displayname"`
+	Description  string                         `xml:"urn:ietf:params:xml:ns:caldav calendar-description"`
+	Color        string                         `xml:"http://apple.com/ns/ical/ calendar-color"`
+	CompSet      *supportedCalendarComponentSet `xml:"urn:ietf:params:xml:ns:caldav supported-calendar-component-set"`
+}
+
+func (p *newCalendarProps) apply(cal *Calendar) {
+	cal.Name = p.DisplayName
+	cal.Description = p.Description
+	cal.Color = strings.TrimSpace(p.Color)
+	if p.CompSet != nil {
+		for _, c := range p.CompSet.Comp {
+			cal.SupportedComponentSet = append(cal.SupportedComponentSet, c.Name)
+		}
+	}
 }

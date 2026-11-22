@@ -320,7 +320,7 @@ func (b *backend) Options(r *http.Request) (caps []string, allow []string, err e
 	caps = []string{"calendar-access"}
 
 	if b.resourceTypeAtPath(r.URL.Path) != resourceTypeCalendarObject {
-		return caps, []string{http.MethodOptions, "PROPFIND", "PROPPATCH", "REPORT", "DELETE", "MKCOL"}, nil
+		return caps, []string{http.MethodOptions, "PROPFIND", "PROPPATCH", "REPORT", "DELETE", "MKCOL", "MKCALENDAR"}, nil
 	}
 
 	var dataReq CalendarCompRequest
@@ -736,14 +736,31 @@ func (b *backend) Mkcol(r *http.Request) error {
 	if !internal.IsRequestBodyEmpty(r) {
 		var m mkcolReq
 		if err := internal.DecodeXMLRequest(r, &m); err != nil {
-			return internal.HTTPErrorf(http.StatusBadRequest, "carddav: error parsing mkcol request: %s", err.Error())
+			return internal.HTTPErrorf(http.StatusBadRequest, "caldav: error parsing mkcol request: %s", err.Error())
 		}
 
-		if !m.ResourceType.Is(internal.CollectionName) || !m.ResourceType.Is(calendarName) {
-			return internal.HTTPErrorf(http.StatusBadRequest, "carddav: unexpected resource type")
+		if !m.Props.ResourceType.Is(internal.CollectionName) || !m.Props.ResourceType.Is(calendarName) {
+			return internal.HTTPErrorf(http.StatusBadRequest, "caldav: unexpected resource type")
 		}
-		cal.Name = m.DisplayName
-		// TODO ...
+		m.Props.apply(&cal)
+	}
+
+	return b.Backend.CreateCalendar(r.Context(), &cal)
+}
+
+// Mkcalendar creates a calendar (RFC 4791 §5.3.1). The body is optional.
+func (b *backend) Mkcalendar(r *http.Request) error {
+	if b.resourceTypeAtPath(r.URL.Path) != resourceTypeCalendar {
+		return internal.HTTPErrorf(http.StatusForbidden, "caldav: calendar creation not allowed at given location")
+	}
+
+	cal := Calendar{Path: r.URL.Path}
+	if !internal.IsRequestBodyEmpty(r) {
+		var m mkcalendarReq
+		if err := internal.DecodeXMLRequest(r, &m); err != nil {
+			return internal.HTTPErrorf(http.StatusBadRequest, "caldav: error parsing mkcalendar request: %s", err.Error())
+		}
+		m.Props.apply(&cal)
 	}
 
 	return b.Backend.CreateCalendar(r.Context(), &cal)

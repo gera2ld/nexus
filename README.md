@@ -44,8 +44,8 @@ app.
 
 ## Limits
 
-- Apps can't create calendars or address books. Each user starts with one
-  of each; add more in the admin UI.
+- Apps can create calendars and address books, but not delete them;
+  deleting one (and everything in it) is done in the admin UI.
 - File modification times set by apps aren't stored.
 
 ## Development

@@ -28,4 +28,8 @@ so they can be offered upstream.
 - Shared helpers live in `internal/sync.go`; protocol glue in
   `caldav/sync.go` and `carddav/sync.go`; tests in `*/sync_test.go`.
 
-Not done: MKCALENDAR, extended MKCOL for clients creating collections.
+- MKCALENDAR (RFC 4791 §5.3.1) through an optional `MkcalendarBackend`
+  interface in `internal`; the CalDAV backend implements it with the same
+  create path as extended MKCOL. Both now pass the body's
+  calendar-description, calendar-color and supported-calendar-component-set
+  to `CreateCalendar` (upstream kept only the display name).
