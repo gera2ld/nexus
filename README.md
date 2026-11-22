@@ -12,12 +12,19 @@ for Thunderbird, DAVx⁵ and ordinary WebDAV clients.
 ## Status
 
 Phase 1 (DAV library) is done apart from testing with real clients.
-Phase 2 (core service) is in progress: the app skeleton and schema are in;
-`/dav` answers 501 until the SQLite-backed store lands.
+Phase 2 (core service) is in progress. CalDAV and CardDAV work end to end
+on SQLite. DAV sign-in is a temporary development mode (account password)
+until App Passwords land; without it, `/dav` answers 401.
 
 ```bash
 go test ./...
 go run ./cmd/nexus superuser upsert admin@example.com <password>
 go run ./cmd/nexus serve                 # admin UI at http://127.0.0.1:8090/_/
+
+# Development only: let DAV clients sign in with the account password.
+NEXUS_DEV_ACCOUNT_PASSWORD_AUTH=1 go run ./cmd/nexus serve
+# Probe nexus with a freshly created user (uid = the user's record id):
+PROBE_AUTH='user@example.com:password' PROBE_UID=<uid> PROBE_CAL=personal \
+  PROBE_BOOK=contacts ./scripts/probe.sh http://127.0.0.1:8090
 ./scripts/probe.sh http://127.0.0.1:8080   # end-to-end checks
 ```

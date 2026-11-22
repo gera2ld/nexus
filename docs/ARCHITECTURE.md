@@ -155,6 +155,21 @@ created when a user is created.
   dtstart/dtend columns, then runs go-webdav's `caldav.Filter` for exact
   matching. That step handles recurring events.
 - **PROPPATCH** updates name, description and colour, all or nothing.
+- **Validation on PUT** (`internal/store`):
+  - one component type and one UID per resource;
+  - the component must be one the calendar accepts;
+  - UIDs are unique within a collection (409 otherwise);
+  - DTSTART, DTEND, DUE, RECURRENCE-ID and DURATION must parse (400
+    otherwise), so one malformed object can't break queries on its calendar;
+  - resources are capped at 1 MiB (413).
+- **Indexed date range:** the earliest start and latest end over all
+  components. Recurring events (RRULE or RDATE) get an open end, so the
+  database prefilter never drops an occurrence. Tasks without dates are
+  always passed on to the exact matcher.
+- **Deleting a whole collection** from a client is refused (403); the admin UI
+  does it. Deleting a calendar or address book also deletes its `dav_changes`
+  rows, via a hook.
+- **Pruning** runs daily from PocketBase's cron (`nexusPruneChanges`, 03:17).
 
 ## 6. Authentication and authorization
 
@@ -250,8 +265,9 @@ created when a user is created.
 - **Why not write our own:** about 2–3k lines and weeks of client-quirk
   debugging that upstream has already done. Recurring-event matching alone is
   a significant job.
-- **Still missing:** MKCALENDAR and extended MKCOL, so clients can't create
-  collections yet; the admin UI does that.
+- **Still missing:** MKCALENDAR. Extended MKCOL creates calendars and address
+  books, but that hasn't been tried with real clients; the admin UI is the
+  supported way to create them.
 
 ## 10. Repository layout
 
@@ -259,17 +275,17 @@ created when a user is created.
 cmd/nexus/       main: PocketBase app; migratecmd registered with automigrate off
 docs/            product and architecture docs (this file)
 internal/dav/    the go-webdav copy and Nexus DAV extensions
-internal/nexus/  wiring: schema on bootstrap, default-collections hook, DAV routes + unbinds
+internal/nexus/  wiring: schema on bootstrap, hooks, cron, DAV routes + unbinds
 internal/schema/ embedded collections snapshot (collections.json) + Apply
+internal/store/  CalDAV/CardDAV backends on PocketBase collections; shared write path and sync
+internal/davserver/ /dav router: principal, calendars/, contacts/; per-user tree check
+internal/auth/   DAV authentication (temporary dev account-password auth until 2c)
+internal/principal/ authenticated user id in the request context
 scripts/probe.sh end-to-end check of a running server (curl)
 ```
 
-Still to come in phase 2:
-
-```
-internal/store/  DAV store backed by PocketBase collections (implements the dav backend interfaces)
-internal/auth/   App Password middleware and scopes
-```
+Still to come in phase 2: App Passwords with scopes in `internal/auth`, and
+an account page.
 
 ## 11. Open technical questions
 

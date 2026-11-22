@@ -1,12 +1,16 @@
 #!/usr/bin/env bash
-# End-to-end probe of a running spike: discovery, CRUD, ctag/sync-token,
-# incremental sync-collection, PROPPATCH. Usage: ./probe.sh [base-url]
+# End-to-end probe of a running DAV server: discovery, CRUD, ctag/sync-token,
+# incremental sync-collection, PROPPATCH. Expects a fresh user.
+# Usage: ./probe.sh [base-url]
+# Defaults: alice:test on :8080; for nexus set PROBE_AUTH, PROBE_UID, PROBE_CAL
+# and PROBE_BOOK (see README).
 set -u
 BASE=${1:-http://127.0.0.1:8080}
-AUTH=alice:test
+AUTH=${PROBE_AUTH:-alice:test}
+PUID=${PROBE_UID:-alice}
 X='Content-Type: application/xml'
-CAL=/dav/alice/calendars/default/
-BOOK=/dav/alice/contacts/default/
+CAL=/dav/$PUID/calendars/${PROBE_CAL:-default}/
+BOOK=/dav/$PUID/contacts/${PROBE_BOOK:-default}/
 pass=0 fail=0
 
 check() { # name, haystack, needle
@@ -19,8 +23,8 @@ ics() { printf 'BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//probe//EN\r\nBEGIN:V
 sync_body() { echo "<D:sync-collection xmlns:D=\"DAV:\"><D:sync-token>$1</D:sync-token><D:sync-level>1</D:sync-level><D:prop><D:getetag/></D:prop></D:sync-collection>"; }
 COLLPROPS='<propfind xmlns="DAV:" xmlns:CS="http://calendarserver.org/ns/"><prop><displayname/><CS:getctag/><sync-token/><supported-report-set/></prop></propfind>'
 
-out=$(req -X PROPFIND -H 'Depth: 0' $BASE/dav/alice/ --data '<propfind xmlns="DAV:"><prop><C:calendar-home-set xmlns:C="urn:ietf:params:xml:ns:caldav"/><A:addressbook-home-set xmlns:A="urn:ietf:params:xml:ns:carddav"/></prop></propfind>')
-check "principal has both home sets" "$out" "/dav/alice/contacts/"
+out=$(req -X PROPFIND -H 'Depth: 0' $BASE/dav/$PUID/ --data '<propfind xmlns="DAV:"><prop><C:calendar-home-set xmlns:C="urn:ietf:params:xml:ns:caldav"/><A:addressbook-home-set xmlns:A="urn:ietf:params:xml:ns:carddav"/></prop></propfind>')
+check "principal has both home sets" "$out" "/dav/$PUID/contacts/"
 
 out=$(req -X PROPFIND -H 'Depth: 0' $BASE$CAL --data "$COLLPROPS")
 check "calendar advertises sync-collection" "$out" '<sync-collection xmlns="DAV:">'
