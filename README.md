@@ -13,18 +13,18 @@ for Thunderbird, DAVx⁵ and ordinary WebDAV clients.
 
 Phase 1 (DAV library) is done apart from testing with real clients.
 Phase 2 (core service) is in progress. CalDAV and CardDAV work end to end
-on SQLite. DAV sign-in is a temporary development mode (account password)
-until App Passwords land; without it, `/dav` answers 401.
+on SQLite, and DAV clients sign in with an App Password created on the
+account page. WebDAV file storage (phase 3) isn't built yet.
 
 ```bash
 go test ./...
 go run ./cmd/nexus superuser upsert admin@example.com <password>
 go run ./cmd/nexus serve                 # admin UI at http://127.0.0.1:8090/_/
+# Create a user in the admin UI (there is no public sign-up), then sign in
+# as that user at http://127.0.0.1:8090/account and create an App Password.
 
-# Development only: let DAV clients sign in with the account password.
-NEXUS_DEV_ACCOUNT_PASSWORD_AUTH=1 go run ./cmd/nexus serve
-# Probe nexus with a freshly created user (uid = the user's record id):
-PROBE_AUTH='user@example.com:password' PROBE_UID=<uid> PROBE_CAL=personal \
+# Probe nexus as that user (uid = the user's record id, shown in the admin UI):
+PROBE_AUTH='user@example.com:<app-password>' PROBE_UID=<uid> PROBE_CAL=personal \
   PROBE_BOOK=contacts ./scripts/probe.sh http://127.0.0.1:8090
 ./scripts/probe.sh http://127.0.0.1:8080   # end-to-end checks
 ```

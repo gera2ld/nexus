@@ -49,6 +49,8 @@ the old auth proxy goes away.
 
 ```
 /_/ , /api/*                              PocketBase (admin dashboard, REST API)
+/account                                  account page: create and revoke App Passwords
+/api/nexus/*                              account page API (PocketBase user token)
 /.well-known/caldav, /.well-known/carddav 301 → /dav/
 /dav/                                     current-user-principal discovery
 /dav/{uid}/                               principal (advertises both home sets)
@@ -176,15 +178,41 @@ created when a user is created.
 - **DAV and file endpoints** use HTTP Basic: the account email plus an App
   Password. The account's own password is never accepted there; it only works
   for the account page and the admin UI.
-- **App Password format:** a random 128-bit secret. Only `sha256(secret)` is
-  stored. A fast hash is enough because the secret has high entropy, and
-  bcrypt would add real cost to every request (DAVx⁵ makes dozens per sync).
-  The secret is shown once, when it's created.
+- **Email lookup is case-insensitive.** The `users` email unique index is
+  `COLLATE NOCASE`, which PocketBase's `FindAuthRecordByEmail` and its
+  password sign-in both honour. It also stops two accounts that differ only
+  in case.
+- **App Password format:** a random 128-bit secret, shown as 26 lowercase
+  base32 characters in groups (`xxxx-xxxx-xxxx-xxxx-xxxxx-xxxxx`). Dashes,
+  spaces and case are ignored when it's typed. Only the SHA-256 of the
+  normalised secret is stored (`secret_hash`, hidden, unique). A fast hash is
+  enough because the secret has high entropy, and bcrypt would add real cost
+  to every request (DAVx⁵ makes dozens per sync). The secret is shown once,
+  when it's created.
 - **Scopes:** each password carries any of `cal`, `card` and `files`. The
-  middleware checks the scope against the endpoint before running a handler.
+  middleware checks the scope against the path before running a handler:
+  `calendars/…` needs `cal`, `contacts/…` needs `card`, `/files/…` needs
+  `files`, and discovery (`/dav/`, `/dav/{uid}/`) accepts either `cal` or
+  `card`. A wrong scope gets 403.
 - **`last_used_at`** is written at most once a minute per password.
-- **Revoked passwords** fail immediately. Validated credentials may be cached
-  in memory for a few seconds, and that cache is cleared on revoke.
+- **Revoked passwords** fail on the next request. There is no credential
+  cache: each request costs one indexed lookup by email and one by hash,
+  which is cheap on SQLite.
+- **Failed sign-ins** are limited per client address: after 10 failures in
+  5 minutes, DAV requests from that address get 429 with `Retry-After` until
+  the window ends. The limiter is in memory and tracks at most 10,000
+  addresses. The address comes from `RealIP()`, so behind a reverse proxy
+  PocketBase's trusted-proxy setting must be configured, or every client
+  shares the proxy's address.
+- **Account page** (`/account`, `internal/account`): one static page, no
+  external scripts, served with a strict CSP. It signs in with PocketBase's
+  normal user password sign-in and keeps the token in `sessionStorage`. It
+  calls `/api/nexus/me`, `GET/POST /api/nexus/app-passwords` and
+  `POST /api/nexus/app-passwords/{id}/revoke`, which require a user token
+  (superuser tokens and App Passwords are refused). `app_passwords` itself
+  stays superuser-only, so hashes never leave the server. At most 50 active
+  App Passwords per user. Rate limiting of the account-password sign-in is
+  PocketBase's own (its rate-limit settings), not ours.
 - **Isolation:** a user can only reach their own `/dav/{uid}` and
   `/files/{uid}` trees. Public sharing and cross-user access control are out
   of scope.
@@ -226,7 +254,7 @@ created when a user is created.
     collections.
 - **Limits:** a maximum request body size for calendar and contact objects
   (reported to clients as `max-resource-size`), and per-IP rate limits on
-  failed sign-ins.
+  failed DAV sign-ins (§6).
 - **Logs:**
   - PocketBase's request log covers raw requests.
   - Nexus adds structured DAV log lines: user, App Password label, method,
@@ -279,13 +307,11 @@ internal/nexus/  wiring: schema on bootstrap, hooks, cron, DAV routes + unbinds
 internal/schema/ embedded collections snapshot (collections.json) + Apply
 internal/store/  CalDAV/CardDAV backends on PocketBase collections; shared write path and sync
 internal/davserver/ /dav router: principal, calendars/, contacts/; per-user tree check
-internal/auth/   DAV authentication (temporary dev account-password auth until 2c)
+internal/auth/   App Password auth for DAV: secrets, scopes, failed-sign-in limiter
+internal/account/ /account page and its /api/nexus API
 internal/principal/ authenticated user id in the request context
 scripts/probe.sh end-to-end check of a running server (curl)
 ```
-
-Still to come in phase 2: App Passwords with scopes in `internal/auth`, and
-an account page.
 
 ## 11. Open technical questions
 

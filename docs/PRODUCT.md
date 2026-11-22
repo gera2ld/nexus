@@ -129,7 +129,7 @@ There is no web calendar or contacts app in the initial release.
 | Tasks (VTODO) in v1 | **Yes.** We store raw iCalendar, so tasks cost almost nothing to add. | **Decided** 2026-11-22 |
 | Who owns storage accounts | Only the admin defines storage accounts; users get mounts assigned to them. | Needs sign-off |
 | Storage backends in v1 | Any rclone backend works underneath. The admin UI offers forms only for S3 and local disk. | Proposed |
-| Where users manage their own App Passwords | A small account page served by Nexus. The PocketBase dashboard is for admins only. | Proposed |
+| Where users manage their own App Passwords | A small account page served by Nexus at `/account`. The PocketBase dashboard is for admins only. | **Decided** 2026-11-22 (built) |
 
 ## 7. Roadmap
 

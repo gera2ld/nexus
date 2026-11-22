@@ -36,7 +36,7 @@ type env struct {
 func setup(t *testing.T) *env {
 	t.Helper()
 	app := core.NewBaseApp(core.BaseAppConfig{DataDir: t.TempDir()})
-	nexus.Setup(app, nexus.Options{})
+	nexus.Setup(app)
 	if err := app.Bootstrap(); err != nil {
 		t.Fatal(err)
 	}

@@ -144,7 +144,7 @@
     ],
     "indexes": [
       "CREATE UNIQUE INDEX `idx_tokenKey__pb_users_auth_` ON `users` (`tokenKey`)",
-      "CREATE UNIQUE INDEX `idx_email__pb_users_auth_` ON `users` (`email`) WHERE `email` != ''"
+      "CREATE UNIQUE INDEX `idx_email__pb_users_auth_` ON `users` (`email` COLLATE NOCASE) WHERE `email` != ''"
     ],
     "created": "2026-11-22 12:00:43.982Z",
     "updated": "2026-11-22 12:00:43.993Z",

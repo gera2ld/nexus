@@ -9,6 +9,7 @@ import (
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/router"
 
+	"nexus/internal/account"
 	"nexus/internal/auth"
 	"nexus/internal/davserver"
 	"nexus/internal/schema"
@@ -19,20 +20,17 @@ import (
 // older sync token get 403 valid-sync-token and resync from scratch.
 const ChangeRetention = 90 * 24 * time.Hour
 
-// Options configure Setup.
-type Options struct {
-	// DevAccountPasswordAuth lets DAV clients sign in with the account
-	// password. Temporary, until App Passwords exist (phase 2c).
-	DevAccountPasswordAuth bool
-}
+// Failed DAV sign-ins allowed per client address before it is blocked for
+// the rest of the window (docs/ARCHITECTURE.md §6).
+const (
+	MaxFailedSignIns   = 10
+	FailedSignInWindow = 5 * time.Minute
+)
 
 // Setup registers everything Nexus adds to app. Call it before app.Start().
-func Setup(app core.App, opts Options) {
+func Setup(app core.App) {
 	st := store.New(app)
-	dav := auth.Disabled()
-	if opts.DevAccountPasswordAuth {
-		dav = auth.DevAccountPassword(app, davserver.New(st))
-	}
+	dav := newDAV(app, st)
 
 	app.OnBootstrap().BindFunc(func(e *core.BootstrapEvent) error {
 		if err := e.Next(); err != nil {
@@ -60,9 +58,22 @@ func Setup(app core.App, opts Options) {
 	})
 
 	app.OnServe().BindFunc(func(se *core.ServeEvent) error {
-		RegisterRoutes(se.Router, dav)
+		mount(se.Router, dav)
 		return se.Next()
 	})
+}
+
+// newDAV is the authenticated DAV handler: App Password auth around the
+// CalDAV/CardDAV server.
+func newDAV(app core.App, st *store.Store) http.Handler {
+	limiter := auth.NewLimiter(MaxFailedSignIns, FailedSignInWindow)
+	return auth.NewAppPassword(app, limiter).Wrap(davserver.New(st))
+}
+
+// mount registers every Nexus route.
+func mount(r *router.Router[*core.RequestEvent], dav http.Handler) {
+	RegisterRoutes(r, dav)
+	account.Register(r)
 }
 
 // davUnbind lists PocketBase global middlewares that break DAV clients
@@ -74,13 +85,10 @@ var davUnbind = []string{
 	apis.DefaultLoadAuthTokenMiddlewareId,      // parses Basic as a PB token
 }
 
-// RegisterRoutes mounts the DAV endpoints on a PocketBase router.
+// RegisterRoutes mounts the DAV endpoints on a PocketBase router. dav must
+// authenticate requests itself; RegisterRoutes only records the client
+// address (honouring PocketBase's trusted-proxy settings) for rate limiting.
 func RegisterRoutes(r *router.Router[*core.RequestEvent], dav http.Handler) {
-	if dav == nil {
-		dav = http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-			http.Error(w, "nexus: DAV not implemented yet", http.StatusNotImplemented)
-		})
-	}
 
 	for _, p := range []string{"/.well-known/caldav", "/.well-known/carddav"} {
 		r.Any(p, func(e *core.RequestEvent) error {
@@ -90,5 +98,9 @@ func RegisterRoutes(r *router.Router[*core.RequestEvent], dav http.Handler) {
 
 	g := r.Group("/dav")
 	g.Unbind(davUnbind...)
-	g.Any("/{path...}", apis.WrapStdHandler(dav))
+	g.Any("/{path...}", func(e *core.RequestEvent) error {
+		r := e.Request.WithContext(auth.WithClientIP(e.Request.Context(), e.RealIP()))
+		dav.ServeHTTP(e.Response, r)
+		return nil
+	})
 }
