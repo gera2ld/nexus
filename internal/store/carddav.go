@@ -182,7 +182,7 @@ func (b *CardDAV) PutAddressObject(ctx context.Context, p string, card vcard.Car
 	if err := vcard.NewEncoder(&buf).Encode(card); err != nil {
 		return nil, httpErr(http.StatusBadRequest, "store: invalid vCard: %v", err)
 	}
-	uid, coll, rec, err := b.s.put(ctx, cardKind, p, putReq{
+	uid, coll, rec, replaced, err := b.s.put(ctx, cardKind, p, putReq{
 		data: buf.Bytes(), uid: uidVal,
 		extra: map[string]any{
 			"fn":    truncate(card.PreferredValue(vcard.FieldFormattedName), 1024),
@@ -194,6 +194,7 @@ func (b *CardDAV) PutAddressObject(ctx context.Context, p string, card vcard.Car
 		return nil, err
 	}
 	o, err := b.toObject(uid, coll, rec)
+	o.Replaced = replaced
 	return &o, err
 }
 

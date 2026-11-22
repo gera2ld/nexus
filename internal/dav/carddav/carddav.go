@@ -115,6 +115,9 @@ type AddressObject struct {
 	ContentLength int64
 	ETag          string
 	Card          vcard.Card
+	// Replaced is set by a backend's Put when the object already
+	// existed; the server then answers 204 instead of 201 (RFC 9110 §9.3.4).
+	Replaced bool
 }
 
 // SyncQuery is the query struct represents a sync-collection request

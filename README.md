@@ -12,12 +12,12 @@ for Thunderbird, DAVx⁵ and ordinary WebDAV clients.
 
 ## Status
 
-Phase 1 (DAV library) is done apart from testing with real clients.
-Phase 2 (core service) is done: CalDAV and CardDAV work end to end on
-SQLite, and DAV clients sign in with an App Password created on the account
-page. Phase 3 (file storage) is in progress: WebDAV files work on local disk
-at `/files/{uid}/`; rclone and the macOS WebDAV client (Finder) are tested; Windows Explorer
-isn't yet.
+Phases 1–4 are done; v1 is ready to deploy ([docs/DEPLOY.md](docs/DEPLOY.md)).
+CalDAV and CardDAV work end to end on SQLite, and DAV clients sign in with
+an App Password created on the account page. WebDAV files are served at
+`/files/{uid}/` from local disk or S3 through rclone. Tested with
+Thunderbird, rclone and Finder; DAVx⁵ and Windows Explorer will be checked
+on the first production deployment.
 
 ```bash
 go test ./...

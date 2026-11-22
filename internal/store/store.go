@@ -211,16 +211,17 @@ type putReq struct {
 	allow   func(coll *core.Record) error // optional per-collection check
 }
 
-func (s *Store) put(ctx context.Context, k kind, p string, req putReq) (uid string, coll, obj *core.Record, err error) {
+// put stores an object; replaced reports whether one was already at p.
+func (s *Store) put(ctx context.Context, k kind, p string, req putReq) (uid string, coll, obj *core.Record, replaced bool, err error) {
 	uid, t, err := parse(ctx, k, p)
 	if err != nil {
-		return "", nil, nil, err
+		return "", nil, nil, false, err
 	}
 	if t.href == "" {
-		return "", nil, nil, httpErr(http.StatusMethodNotAllowed, "store: cannot PUT a collection")
+		return "", nil, nil, false, httpErr(http.StatusMethodNotAllowed, "store: cannot PUT a collection")
 	}
 	if len(req.data) > MaxResourceSize {
-		return "", nil, nil, httpErr(http.StatusRequestEntityTooLarge, "store: resource exceeds %d bytes", MaxResourceSize)
+		return "", nil, nil, false, httpErr(http.StatusRequestEntityTooLarge, "store: resource exceeds %d bytes", MaxResourceSize)
 	}
 
 	err = s.app.RunInTransaction(func(tx core.App) error {
@@ -237,6 +238,7 @@ func (s *Store) put(ctx context.Context, k kind, p string, req putReq) (uid stri
 			return err
 		}
 		cur := ""
+		replaced = obj != nil
 		if obj != nil {
 			cur = obj.GetString("etag")
 		}
@@ -280,7 +282,7 @@ func (s *Store) put(ctx context.Context, k kind, p string, req putReq) (uid stri
 		}
 		return recordChange(tx, k, coll, t.href, seq, false)
 	})
-	return uid, coll, obj, err
+	return uid, coll, obj, replaced, err
 }
 
 func (s *Store) delete(ctx context.Context, k kind, p string) error {

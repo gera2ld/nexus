@@ -655,8 +655,11 @@ func (b *backend) Put(w http.ResponseWriter, r *http.Request) error {
 		w.Header().Set("Location", ao.Path)
 	}
 
-	// TODO: http.StatusNoContent if the resource already existed
-	w.WriteHeader(http.StatusCreated)
+	if ao.Replaced {
+		w.WriteHeader(http.StatusNoContent)
+	} else {
+		w.WriteHeader(http.StatusCreated)
+	}
 
 	return nil
 }

@@ -221,7 +221,7 @@ func (b *CalDAV) PutCalendarObject(ctx context.Context, p string, cal *ical.Cale
 	if !info.end.IsZero() {
 		extra["dtend"] = info.end.UTC()
 	}
-	uid, coll, rec, err := b.s.put(ctx, calKind, p, putReq{
+	uid, coll, rec, replaced, err := b.s.put(ctx, calKind, p, putReq{
 		data: buf.Bytes(), uid: info.uid, extra: extra,
 		ifMatch: opts.IfMatch, ifNone: opts.IfNoneMatch,
 		allow: func(coll *core.Record) error {
@@ -237,6 +237,7 @@ func (b *CalDAV) PutCalendarObject(ctx context.Context, p string, cal *ical.Cale
 		return nil, err
 	}
 	o, err := b.toObject(uid, coll, rec)
+	o.Replaced = replaced
 	return &o, err
 }
 

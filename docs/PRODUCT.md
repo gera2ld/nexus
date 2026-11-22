@@ -136,10 +136,10 @@ There is no web calendar or contacts app in the initial release.
 
 | Phase | Scope | Status |
 |---|---|---|
-| 1. DAV library | Pick the Go DAV library and check it against Thunderbird and DAVx⁵; confirm the CalDAV/CardDAV methods and sync behaviour we need | Library chosen and extended. Checked with curl; **real-client testing still to do** |
+| 1. DAV library | Pick the Go DAV library and check it against Thunderbird and DAVx⁵; confirm the CalDAV/CardDAV methods and sync behaviour we need | Library chosen and extended. Thunderbird checked; DAVx⁵ to be checked in production |
 | 2. Core service | PocketBase users, App Passwords, calendars and contacts stored in SQLite, CalDAV and CardDAV | Done |
-| 3. Storage | rclone integration, S3 configuration, per-user mounts, WebDAV file operations | Done (Windows Explorer untested) |
-| 4. Hardening | Real-client testing, conditional updates, error handling, backup and restore, Docker image | In progress |
+| 3. Storage | rclone integration, S3 configuration, per-user mounts, WebDAV file operations | Done (Windows Explorer to be checked in production) |
+| 4. Hardening | Real-client testing, conditional updates, error handling, backup and restore, Docker image | Done (DAVx⁵ and Windows Explorer to be checked in production) |
 
 **v1 is done when** the Baïkal + rclone + auth-proxy setup can be switched
 off, with Thunderbird and DAVx⁵ syncing both ways through Nexus.

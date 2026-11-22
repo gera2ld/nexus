@@ -332,7 +332,7 @@ add about 22 MB to the binary.
     times (properties are accepted but not stored); extended attributes
     such as Finder tags are stored by macOS as `._name` files next to the
     file, as on any non-Apple WebDAV server, and removed with it.
-  - **Windows Explorer:** not tested; needs a Windows machine.
+  - **Windows Explorer:** not tested; to be checked in production.
   - Also found while reading the code: COPY's destination wasn't checked by
     Nexus (only the read-only VFS refused it); fixed and covered.
 
@@ -401,8 +401,12 @@ Conditional updates were already done in phases 2 and 3 (`If-Match` /
 - **4b (done).** Docker image and a deployment guide for Caddy (volumes,
   key, trusted-proxy setting, restore procedure, logs). The container
   passed `probe.sh` 32/32 directly and survived a restart.
-- **4c.** Real clients: Thunderbird (on the dev Mac); DAVx⁵ and Windows
-  Explorer need the user's phone and a Windows machine.
+- **4c (done).** Real clients. **Thunderbird 160: done**: discovery
+  from just the server address, and create, edit and delete both ways for
+  events and contacts. It
+  found one bug: PUT answered 201 when it replaced an object; it now answers
+  204. DAVx⁵ and Windows Explorer were skipped here and will be
+  checked on the first production deployment.
 
 ## 9. DAV library
 
@@ -451,7 +455,7 @@ scripts/probe.sh end-to-end check of a running server (curl)
 | Question | Status |
 |---|---|
 | Which Go DAV library, and does it cover CalDAV/CardDAV fully? | **Resolved:** a go-webdav copy plus our extensions (§9) |
-| Exact Thunderbird / DAVx⁵ discovery and sign-in behaviour | **Partly done:** discovery checked with curl; real clients still to test |
+| Exact Thunderbird / DAVx⁵ discovery and sign-in behaviour | **Partly done:** Thunderbird checked; DAVx⁵ to be checked in production |
 | S3 only, or any rclone backend from day one? | **Proposed:** any backend underneath, UI forms for S3 and local only (§7) |
 | Versioning and conflict behaviour for S3 files | **Proposed:** checked `If-Match`, last writer wins, documented (§7) |
 | Does PocketBase's router pass DAV methods through? | **Resolved** on v0.42.3: yes, once `pbRejectUnknownToken`, `pbCors`, `pbBodyLimit` and `pbLoadAuthToken` are unbound on DAV routes (§3) |
