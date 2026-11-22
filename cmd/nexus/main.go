@@ -18,7 +18,9 @@ func main() {
 	// automigrate stays off because it writes a migration per UI edit.
 	migratecmd.MustRegister(app, app.RootCmd, migratecmd.Config{Automigrate: false})
 
-	nexus.Setup(app)
+	if err := nexus.Setup(app); err != nil {
+		log.Fatal(err)
+	}
 
 	if err := app.Start(); err != nil {
 		log.Fatal(err)

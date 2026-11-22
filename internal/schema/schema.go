@@ -36,4 +36,6 @@ const (
 	Addressbooks    = "addressbooks"
 	Contacts        = "contacts"
 	DAVChanges      = "dav_changes"
+	StorageAccounts = "storage_accounts"
+	Mounts          = "mounts"
 )

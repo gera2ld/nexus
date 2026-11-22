@@ -124,8 +124,8 @@ full on every start with `ImportCollectionsByMarshaledJSON(snapshot, true)`:
 | `addressbooks` | owner, slug, name, description, `sync_seq` | Unique per (owner, slug) |
 | `contacts` | addressbook, href, uid, `vcf`, etag, fn, email, `seq` | |
 | `dav_changes` | collection, href, seq, deleted | Change log and deletion records for sync |
-| `storage_accounts` | name, backend type, `options` (encrypted JSON) | Defined by the admin |
-| `mounts` | user, account, name, remote_path, read_only | `/files/{uid}/{name}` |
+| `storage_accounts` | name, type (`local` / `s3`), `options` (plain JSON), `secret_options` (write-only input), `secrets_enc` (hidden, AES-256-GCM) | Defined by the admin (§7) |
+| `mounts` | user, account, name, remote_path, read_only | `/files/{uid}/{name}`; unique per (user, name) |
 
 A default calendar ("Personal") and a default address book ("Contacts") are
 created when a user is created.
@@ -219,21 +219,53 @@ created when a user is created.
 
 ## 7. File storage
 
-- The file handler is `golang.org/x/net/webdav.Handler`. Its `FileSystem` is
-  an adapter over an rclone `vfs.VFS` per mount, and its `LockSystem` is
-  in-memory (`webdav.NewMemLS()`). This is the same arrangement as `rclone
-  serve webdav`. It gives correct PROPFIND, MOVE and COPY behaviour, plus
-  caching and write buffering on top of S3.
-- **Storage Manager:** maps `{uid}/{mount}` to a mount, then to a storage
-  account. It builds the rclone `fs.Fs` from the account's backend type and
-  options, and caches the resulting `vfs.VFS`. The cache is cleared when the
-  account or mount changes.
-- **Generic backends:** accounts store `{type, options}` exactly as rclone
-  takes them, so any rclone backend works. The admin UI provides forms for S3
-  and local disk only.
+Decided 2026-11-22: only the admin defines storage accounts and assigns
+mounts; WebDAV LOCK is in v1 with in-memory locks. A throwaway check on the
+same day (rclone v1.76.0, local backend, `x/net/webdav`) passed MKCOL, PUT,
+PROPFIND, LOCK (423 without the token, success with it), UNLOCK, MOVE, and a
+`..` escape attempt (404). rclone's `local` and `s3` backends plus its VFS
+add about 22 MB to the binary.
+
+- **Handler:** `golang.org/x/net/webdav.Handler` per mount. Its `FileSystem`
+  is an adapter over an rclone `vfs.VFS` (adapted from rclone's own `serve
+  webdav`, MIT), and its `LockSystem` is `webdav.NewMemLS()`, one per mount.
+  Locks are lost on restart, which clients tolerate.
+- **URLs:** `/files/{uid}/` lists the user's mounts as read-only
+  directories; `/files/{uid}/{mount}/…` is the mount. `{uid}` must be the
+  signed-in user (403 otherwise), and the App Password needs the `files`
+  scope (§6).
+- **Backends compiled in:** `local` and `s3` only, registered by blank
+  import. Others can be added later by import; `backend/all` would add a lot
+  of size for backends nobody here uses.
+- **Storage accounts** (`storage_accounts`, superuser-only):
+  - `type`: `local` or `s3`.
+  - `options`: plain JSON object of rclone backend options
+    (`{"provider": "AWS", "region": "eu-central-1"}`), visible in the
+    dashboard.
+  - `secret_options`: a **write-only** JSON input for options rclone marks
+    as sensitive or passwords (`secret_access_key`, `access_key_id`, …). On
+    save, a hook encrypts it into `secrets_enc` and clears the input. Leaving
+    it blank keeps the stored secrets; entering a new object replaces them.
+  - Save-time checks: every key must be an option of that backend; sensitive
+    options are refused in `options` (so secrets can't land in plain text);
+    non-sensitive ones are refused in `secret_options`.
+  - Encryption: AES-256-GCM with a 32-byte key from `NEXUS_ENC_KEY`
+    (base64). Saving secrets without the key fails with a clear error; so
+    does opening a mount whose account has secrets.
+- **Mounts** (`mounts`, superuser-only): `user` (cascade on user delete),
+  `account` (an account in use can't be deleted), `name` (a lowercase slug,
+  the URL segment), `remote_path` (the root within the account: an absolute
+  directory for `local`, `bucket/prefix` for `s3`), `read_only`.
+- **Storage manager** (`internal/storage`): maps (user, mount name) to a
+  cached `vfs.VFS` built from the account's type, options and decrypted
+  secrets, rooted at `remote_path`. Saving or deleting a mount or account
+  drops the affected cache entries and shuts their VFS down.
+- **VFS settings:** cache mode off (writes stream straight to the backend,
+  as in `rclone serve webdav`'s default), directory cache 1 minute, so
+  changes made outside Nexus show up within a minute.
 - **Mount isolation:** the mount's `remote_path` is the root of everything
-  that mount can reach. The vfs path is built only from the cleaned path below
-  the mount name.
+  that mount can reach. The VFS path is built only from the cleaned path
+  below the mount name, and any `..` element is rejected.
 - **ETags and conflicts:**
   - The ETag is the backend's MD5 hash where one exists (S3 has it), else size
     plus modification time.
@@ -242,14 +274,25 @@ created when a user is created.
   - MOVE and COPY on S3 are copy-then-delete, which isn't atomic either.
 - **Read-only mounts** reject every write method with 403.
 
+**Build steps:**
+
+- **3a (done).** Storage schema, secret encryption and validation hooks, the
+  storage manager with cache invalidation; `local` and `s3` backends. The
+  binary grew from 34 MB to 56 MB.
+- **3b.** The `/files` WebDAV handler: mount listing, per-mount handler and
+  locks, read-only mounts, ETags and `If-Match`, App Password `files` scope,
+  PocketBase middleware unbinds; a files section in `probe.sh`.
+- **3c.** S3 end to end against MinIO; macOS Finder, Windows Explorer and
+  rclone as clients.
+
 ## 8. Security, reliability and operations
 
 - **TLS:** required in production, ended either by Nexus or by a reverse proxy
   in front of it. Plain HTTP is allowed only on a loopback or dev address.
 - **Secrets at rest:**
   - App Passwords are stored as hashes.
-  - Storage account options are encrypted with AES-256-GCM, using a key from
-    `NEXUS_ENC_KEY`.
+  - Storage account secrets are encrypted with AES-256-GCM, using a key from
+    `NEXUS_ENC_KEY` (§7). Non-secret options stay readable.
   - PocketBase's own settings encryption covers only its settings, not our
     collections.
 - **Limits:** a maximum request body size for calendar and contact objects
@@ -309,6 +352,7 @@ internal/store/  CalDAV/CardDAV backends on PocketBase collections; shared write
 internal/davserver/ /dav router: principal, calendars/, contacts/; per-user tree check
 internal/auth/   App Password auth for DAV: secrets, scopes, failed-sign-in limiter
 internal/account/ /account page and its /api/nexus API
+internal/storage/ storage accounts and mounts: secret encryption, save checks, rclone VFS manager
 internal/principal/ authenticated user id in the request context
 scripts/probe.sh end-to-end check of a running server (curl)
 ```

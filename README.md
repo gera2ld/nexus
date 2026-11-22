@@ -14,11 +14,13 @@ for Thunderbird, DAVx⁵ and ordinary WebDAV clients.
 Phase 1 (DAV library) is done apart from testing with real clients.
 Phase 2 (core service) is in progress. CalDAV and CardDAV work end to end
 on SQLite, and DAV clients sign in with an App Password created on the
-account page. WebDAV file storage (phase 3) isn't built yet.
+account page. WebDAV file storage (phase 3) is in progress: storage accounts and mounts
+can be defined in the admin UI, but `/files` isn't served yet.
 
 ```bash
 go test ./...
 go run ./cmd/nexus superuser upsert admin@example.com <password>
+export NEXUS_ENC_KEY=$(openssl rand -base64 32)  # encrypts storage secrets; keep it safe
 go run ./cmd/nexus serve                 # admin UI at http://127.0.0.1:8090/_/
 # Create a user in the admin UI (there is no public sign-up), then sign in
 # as that user at http://127.0.0.1:8090/account and create an App Password.

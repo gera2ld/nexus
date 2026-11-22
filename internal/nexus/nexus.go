@@ -3,6 +3,7 @@ package nexus
 
 import (
 	"net/http"
+	"os"
 	"time"
 
 	"ganigeorgiev.com/pocketbase/pocketbase/apis"
@@ -13,6 +14,7 @@ import (
 	"nexus/internal/auth"
 	"nexus/internal/davserver"
 	"nexus/internal/schema"
+	"nexus/internal/storage"
 	"nexus/internal/store"
 )
 
@@ -28,7 +30,19 @@ const (
 )
 
 // Setup registers everything Nexus adds to app. Call it before app.Start().
-func Setup(app core.App) {
+// It fails only on bad configuration, such as a malformed NEXUS_ENC_KEY.
+func Setup(app core.App) error {
+	sealer, err := storage.NewSealer(os.Getenv(storage.KeyEnv))
+	if err != nil {
+		return err
+	}
+	files := storage.NewManager(app, sealer)
+	files.Bind(app)
+	app.OnTerminate().BindFunc(func(e *core.TerminateEvent) error {
+		files.Close()
+		return e.Next()
+	})
+
 	st := store.New(app)
 	dav := newDAV(app, st)
 
@@ -61,6 +75,7 @@ func Setup(app core.App) {
 		mount(se.Router, dav)
 		return se.Next()
 	})
+	return nil
 }
 
 // newDAV is the authenticated DAV handler: App Password auth around the

@@ -21,7 +21,9 @@ import (
 func newApp(t *testing.T, dir string) *core.BaseApp {
 	t.Helper()
 	app := core.NewBaseApp(core.BaseAppConfig{DataDir: dir})
-	Setup(app)
+	if err := Setup(app); err != nil {
+		t.Fatal(err)
+	}
 	if err := app.Bootstrap(); err != nil {
 		t.Fatalf("bootstrap: %v", err)
 	}

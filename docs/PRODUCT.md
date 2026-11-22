@@ -77,9 +77,10 @@ disagree, the client wins, as long as the spec still allows what we do.
   filesystem.
 - Uses the same users, App Passwords and admin as calendars and contacts.
 - ETags and conditional requests where the storage backend supports them.
+- WebDAV locking (LOCK/UNLOCK), so macOS Finder and Windows Explorer can
+  write. Locks are kept in memory and lost on restart.
 - Out of scope unless a target client needs it: incremental file sync
-  (RFC 6578 on file trees). Whether WebDAV locking (LOCK/UNLOCK) is in v1 is
-  still open (see §6).
+  (RFC 6578 on file trees).
 
 ### 3.4 Administration
 
@@ -125,9 +126,9 @@ There is no web calendar or contacts app in the initial release.
 
 | Decision | Proposal | Status |
 |---|---|---|
-| WebDAV LOCK/UNLOCK in v1 | **Yes.** It costs almost nothing in our file stack, and macOS Finder and Windows Explorer won't write to a WebDAV share without it. The original spec ruled it out. | Needs sign-off |
+| WebDAV LOCK/UNLOCK in v1 | **Yes**, with in-memory locks. It costs almost nothing in our file stack, and macOS Finder and Windows Explorer won't write to a WebDAV share without it. The original spec ruled it out. | **Decided** 2026-11-22 |
 | Tasks (VTODO) in v1 | **Yes.** We store raw iCalendar, so tasks cost almost nothing to add. | **Decided** 2026-11-22 |
-| Who owns storage accounts | Only the admin defines storage accounts; users get mounts assigned to them. | Needs sign-off |
+| Who owns storage accounts | Only the admin defines storage accounts; users get mounts assigned to them. Users never see or enter storage credentials. | **Decided** 2026-11-22 |
 | Storage backends in v1 | Any rclone backend works underneath. The admin UI offers forms only for S3 and local disk. | Proposed |
 | Where users manage their own App Passwords | A small account page served by Nexus at `/account`. The PocketBase dashboard is for admins only. | **Decided** 2026-11-22 (built) |
 
@@ -136,8 +137,8 @@ There is no web calendar or contacts app in the initial release.
 | Phase | Scope | Status |
 |---|---|---|
 | 1. DAV library | Pick the Go DAV library and check it against Thunderbird and DAVx⁵; confirm the CalDAV/CardDAV methods and sync behaviour we need | Library chosen and extended. Checked with curl; **real-client testing still to do** |
-| 2. Core service | PocketBase users, App Passwords, calendars and contacts stored in SQLite, CalDAV and CardDAV | Next |
-| 3. Storage | rclone integration, S3 configuration, per-user mounts, WebDAV file operations | — |
+| 2. Core service | PocketBase users, App Passwords, calendars and contacts stored in SQLite, CalDAV and CardDAV | Done |
+| 3. Storage | rclone integration, S3 configuration, per-user mounts, WebDAV file operations | In progress |
 | 4. Hardening | Real-client testing, conditional updates, error handling, backup and restore, Docker image | — |
 
 **v1 is done when** the Baïkal + rclone + auth-proxy setup can be switched
