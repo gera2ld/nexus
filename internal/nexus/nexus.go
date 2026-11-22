@@ -127,8 +127,13 @@ func RegisterRoutes(r *router.Router[*core.RequestEvent], dav http.Handler) {
 	}).Unbind(davUnbind...)
 
 	serve := func(e *core.RequestEvent) error {
-		r := e.Request.WithContext(auth.WithClientIP(e.Request.Context(), e.RealIP()))
-		dav.ServeHTTP(e.Response, r)
+		ctx, meta := auth.WithLogMeta(auth.WithClientIP(e.Request.Context(), e.RealIP()))
+		if d := e.Request.Header.Get("Depth"); d != "" {
+			meta["depth"] = d
+		}
+		// PocketBase's request log entry for this request carries meta.
+		e.Set(apis.RequestEventKeyLogMeta, meta)
+		dav.ServeHTTP(e.Response, e.Request.WithContext(ctx))
 		return nil
 	}
 	for _, prefix := range []string{"/dav", files.Prefix} {

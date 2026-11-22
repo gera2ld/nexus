@@ -349,23 +349,51 @@ add about 22 MB to the binary.
 - **Limits:** a maximum request body size for calendar and contact objects
   (reported to clients as `max-resource-size`), and per-IP rate limits on
   failed DAV sign-ins (§6).
-- **Logs:**
-  - PocketBase's request log covers raw requests.
-  - Nexus adds structured DAV log lines: user, App Password label, method,
-    path, Depth, status, duration and client User-Agent. They're tagged so the
-    admin UI can filter for sync and error lines.
+- **Logs:** one entry per request, in PocketBase's request log (admin UI →
+  Logs). PocketBase records method, URL, status, duration and User-Agent;
+  for `/dav` and `/files` Nexus adds a `meta` object instead of writing a
+  second line (DAVx⁵ makes dozens of requests per sync):
+  - `signin`: `ok`, `none` (no credentials; clients often try this first),
+    `failed` (unknown email, wrong or revoked App Password), `blocked` (rate
+    limited) or `scope` (App Password lacks the needed access).
+  - `user` (as typed, for a failed sign-in, to spot typos), `appPassword`
+    (its label) and `appPasswordId`, and `depth`.
+  - Filter in the admin UI with, for example,
+    `data.meta.user = "ada@example.com"` or `data.meta.signin = "failed"`.
+    PocketBase logs 4xx and 5xx at error level, so a client's first
+    unauthenticated request shows as an error with `signin` `none`.
 - **Backup:**
-  - SQLite plus config is the primary backup. Use PocketBase's built-in
-    backups; check that they include our collections and can be uploaded to
-    S3.
-  - Object storage is backed up separately, with the provider's versioning or
-    an `rclone sync` to a second bucket.
-  - The restore procedure goes in the deployment docs and gets tested in
-    phase 4.
+  - PocketBase's built-in backups (admin UI → Settings → Backups, or the
+    `/api/backups` API) are the backup. The zip holds `pb_data`, so every
+    Nexus collection is in it: users, App Password hashes, calendars,
+    contacts, sync state, storage accounts and mounts.
+  - **Keep `NEXUS_ENC_KEY` with the backup, but not in it.** Storage
+    secrets in a backup can't be decrypted without the key, and a restored
+    instance with a different key can't open S3 mounts.
+  - Tested (4a): a Go test backs up a used instance, unpacks it into an
+    empty data directory and checks sign-in, calendars, contacts, files and
+    secrets; an end-to-end run restored through the real API on a running
+    server, which restarted itself with the backed-up data.
+  - Uploading backups to S3 is PocketBase's own setting and isn't tested
+    separately, for the same reason as rclone's S3 backend.
+  - File contents on mounts are not in the backup. Back them up with the
+    provider's versioning or an `rclone sync` to a second bucket.
 - **Deployment:** one container image. It has a data volume (the PocketBase
   `pb_data` folder: SQLite, backups, logs) and config set through environment
   variables (`NEXUS_ENC_KEY`, listen address, public URL). A local-disk
   storage account needs its own volume.
+
+### Phase 4 steps
+
+Conditional updates were already done in phases 2 and 3 (`If-Match` /
+`If-None-Match` on CalDAV, CardDAV and files, with tests).
+
+- **4a (done).** Request logs that answer "why isn't my phone syncing?", and a
+  tested backup-and-restore round trip.
+- **4b.** Docker image and a deployment guide (volumes, environment, reverse
+  proxy and trusted-proxy settings, TLS, restore procedure).
+- **4c.** Real clients: Thunderbird (on the dev Mac); DAVx⁵ and Windows
+  Explorer need the user's phone and a Windows machine.
 
 ## 9. DAV library
 
@@ -419,4 +447,4 @@ scripts/probe.sh end-to-end check of a running server (curl)
 | Versioning and conflict behaviour for S3 files | **Proposed:** checked `If-Match`, last writer wins, documented (§7) |
 | Does PocketBase's router pass DAV methods through? | **Resolved** on v0.42.3: yes, once `pbRejectUnknownToken`, `pbCors`, `pbBodyLimit` and `pbLoadAuthToken` are unbound on DAV routes (§3) |
 | Does PocketBase's request log record DAV requests? | **Resolved** 2026-11-23: yes. `_logs` in `auxiliary.db` has method, URL, status and User-Agent for every `/dav` and `/files` request (it writes in batches, which is why the first check saw nothing). Nexus's own log lines still add the user and App Password label (§8) |
-| Do PocketBase backups cover our collections and upload to S3? | Open; check in phase 4 (§8) |
+| Do PocketBase backups cover our collections and upload to S3? | **Resolved** 2026-11-23: they cover every collection, and restore is tested (§8). S3 upload is PocketBase's own feature and isn't tested separately |

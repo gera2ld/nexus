@@ -3,6 +3,7 @@ package nexus
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -24,6 +25,8 @@ type server struct {
 	t   *testing.T
 	app core.App
 	mux http.Handler
+	// logMeta is what the last request attached to PocketBase's request log.
+	logMeta auth.LogMeta
 }
 
 func newServer(t *testing.T) *server {
@@ -34,6 +37,12 @@ func newServer(t *testing.T) *server {
 		t.Fatal(err)
 	}
 	r.Bind(apis.CORS(apis.CORSConfig{AllowOrigins: []string{"*"}})) // as apis.Serve does
+	s := &server{t: t, app: app}
+	r.BindFunc(func(e *core.RequestEvent) error { // sees what the activity logger sees
+		err := e.Next()
+		s.logMeta, _ = e.Get(apis.RequestEventKeyLogMeta).(auth.LogMeta)
+		return err
+	})
 	mounts := storage.NewManager(app, nil)
 	mounts.Bind(app)
 	t.Cleanup(mounts.Close)
@@ -42,7 +51,8 @@ func newServer(t *testing.T) *server {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return &server{t: t, app: app, mux: mux}
+	s.mux = mux
+	return s
 }
 
 type resp struct {
@@ -402,4 +412,34 @@ func mustSuperuser(t *testing.T, app core.App) *core.Record {
 		t.Fatal(err)
 	}
 	return su
+}
+
+func TestRequestLogMeta(t *testing.T) {
+	s := newServer(t)
+	u, tok := s.user("ada@example.com")
+	pw := s.newPassword(tok, "Pixel phone", "card")
+	cal := "/dav/" + u.Id + "/calendars/personal/"
+	book := "/dav/" + u.Id + "/contacts/contacts/"
+
+	cases := []struct {
+		name  string
+		path  string
+		setup func(*http.Request)
+		want  auth.LogMeta
+	}{
+		{"ok", book, basic("ADA@example.com", pw.Secret),
+			auth.LogMeta{"signin": "ok", "user": "ada@example.com", "appPassword": "Pixel phone", "appPasswordId": pw.ID, "depth": "0"}},
+		{"no credentials", book, nil, auth.LogMeta{"signin": "none", "depth": "0"}},
+		{"wrong secret", book, basic("ada@exmaple.com", "guess"),
+			auth.LogMeta{"signin": "failed", "user": "ada@exmaple.com", "depth": "0"}},
+		{"scope", cal, basic("ada@example.com", pw.Secret),
+			auth.LogMeta{"signin": "scope", "user": "ada@example.com", "appPassword": "Pixel phone", "appPasswordId": pw.ID, "depth": "0"}},
+	}
+	for _, c := range cases {
+		s.logMeta = nil
+		s.propfind(c.path, c.setup)
+		if fmt.Sprint(s.logMeta) != fmt.Sprint(c.want) {
+			t.Errorf("%s: log meta %v, want %v", c.name, s.logMeta, c.want)
+		}
+	}
 }

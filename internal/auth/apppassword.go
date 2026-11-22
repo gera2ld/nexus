@@ -117,8 +117,10 @@ func NewAppPassword(app core.App, limiter *Limiter) *AppPassword {
 // Wrap authenticates and authorises each request before calling next.
 func (a *AppPassword) Wrap(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
 		ip := clientIP(r)
 		if a.limiter.Blocked(ip) {
+			setMeta(ctx, "signin", SignInBlocked)
 			w.Header().Set("Retry-After", "300")
 			http.Error(w, "too many failed sign-ins", http.StatusTooManyRequests)
 			return
@@ -126,21 +128,29 @@ func (a *AppPassword) Wrap(next http.Handler) http.Handler {
 
 		email, secret, ok := r.BasicAuth()
 		if !ok {
+			setMeta(ctx, "signin", SignInNone)
 			Challenge(w)
 			return
 		}
 		user, pw := a.check(email, secret)
 		if pw == nil {
+			setMeta(ctx, "signin", SignInFailed)
+			setMeta(ctx, "user", email) // as typed, to spot typos
 			a.limiter.Fail(ip)
 			Challenge(w)
 			return
 		}
+		setMeta(ctx, "user", user.Email())
+		setMeta(ctx, "appPassword", pw.GetString("label"))
+		setMeta(ctx, "appPasswordId", pw.Id)
 
 		if !hasAnyScope(pw.GetStringSlice("scopes"), RequiredScopes(r.URL.Path)) {
+			setMeta(ctx, "signin", SignInScope)
 			http.Error(w, "this App Password is not allowed to access "+r.URL.Path, http.StatusForbidden)
 			return
 		}
 
+		setMeta(ctx, "signin", SignInOK)
 		a.touch(pw)
 		next.ServeHTTP(w, r.WithContext(principal.With(r.Context(), user.Id)))
 	})
