@@ -132,14 +132,13 @@ There is no web calendar or contacts app in the initial release.
 | Storage backends in v1 | Any rclone backend works underneath. The admin UI offers forms only for S3 and local disk. | Proposed |
 | Where users manage their own App Passwords | A small account page served by Nexus at `/account`. The PocketBase dashboard is for admins only. | **Decided** 2026-11-22 (built) |
 
-## 7. Roadmap
+## 7. Status
 
-| Phase | Scope | Status |
-|---|---|---|
-| 1. DAV library | Pick the Go DAV library and check it against Thunderbird and DAVx⁵; confirm the CalDAV/CardDAV methods and sync behaviour we need | Library chosen and extended. Thunderbird checked; DAVx⁵ to be checked in production |
-| 2. Core service | PocketBase users, App Passwords, calendars and contacts stored in SQLite, CalDAV and CardDAV | Done |
-| 3. Storage | rclone integration, S3 configuration, per-user mounts, WebDAV file operations | Done (Windows Explorer to be checked in production) |
-| 4. Hardening | Real-client testing, conditional updates, error handling, backup and restore, Docker image | Done (DAVx⁵ and Windows Explorer to be checked in production) |
+Everything in this document's v1 scope is built: calendars and contacts
+on SQLite, App Passwords and the account page, file mounts on local disk
+or S3 through rclone, request logs, backup and restore, and a Docker
+image. Thunderbird, rclone and Finder are checked; DAVx⁵ and Windows
+Explorer are still to check ([CLIENTS.md](CLIENTS.md)).
 
 **v1 is done when** the Baïkal + rclone + auth-proxy setup can be switched
 off, with Thunderbird and DAVx⁵ syncing both ways through Nexus.

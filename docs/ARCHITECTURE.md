@@ -304,37 +304,9 @@ add about 22 MB to the binary.
   - MOVE and COPY on S3 are copy-then-delete, which isn't atomic either.
 - **Read-only mounts** reject every write method with 403.
 
-**Build steps:**
-
-- **3a (done).** Storage schema, secret encryption and validation hooks, the
-  storage manager with cache invalidation; `local` and `s3` backends. The
-  binary grew from 34 MB to 56 MB.
-- **3b (done).** The `/files` WebDAV handler: mount listing, per-user
-  handler and locks, read-only mounts, ETags and `If-Match`, App Password
-  `files` scope, PocketBase middleware unbinds; the account page shows the
-  files address and mounts; a files section in `probe.sh`.
-- **3c (done 2026-11-23, apart from Windows).** S3 itself is not tested
-  separately: Nexus passes options straight to rclone's s3 backend, which
-  rclone maintains and tests (decided 2026-11-23). The first real S3 mount
-  is the check. Results, local-disk mounts:
-  - **rclone v1.76.0** (`webdav`, vendor `other`): copy, check, sync with
-    deletes, a second copy transferring nothing, unicode / `%` / `#` /
-    spaces / empty files / empty folders byte-identical, 300 MB up and
-    down, server-side move and directory move within a mount, moves
-    between mounts, read-only and top-level writes refused with Nexus's
-    messages. Found and fixed: moves between mounts failed outright, and
-    MKCOL on an existing mount gave 403 instead of 405.
-  - **macOS WebDAVFS 3.0.0** (what Finder's Connect to Server uses, driven
-    with `mount_webdav`): mounts read-write (class 2), create, append,
-    overwrite, nested folders with accents, 50 MB copy, rename, moves of
-    files and folders between mounts, read-only mount and top level give
-    "Operation not permitted". Notes: `touch` doesn't change modification
-    times (properties are accepted but not stored); extended attributes
-    such as Finder tags are stored by macOS as `._name` files next to the
-    file, as on any non-Apple WebDAV server, and removed with it.
-  - **Windows Explorer:** not tested; to be checked in production.
-  - Also found while reading the code: COPY's destination wasn't checked by
-    Nexus (only the read-only VFS refused it); fixed and covered.
+**Client results** are in [CLIENTS.md](CLIENTS.md). S3 isn't tested
+separately: Nexus passes options straight to rclone's s3 backend, which
+rclone maintains and tests, so the first real S3 mount is the check.
 
 ## 8. Security, reliability and operations
 
@@ -370,7 +342,7 @@ add about 22 MB to the binary.
   - **Keep `NEXUS_ENC_KEY` with the backup, but not in it.** Storage
     secrets in a backup can't be decrypted without the key, and a restored
     instance with a different key can't open S3 mounts.
-  - Tested (4a): a Go test backs up a used instance, unpacks it into an
+  - Tested: a Go test backs up a used instance, unpacks it into an
     empty data directory and checks sign-in, calendars, contacts, files and
     secrets; an end-to-end run restored through the real API on a running
     server, which restarted itself with the backed-up data.
@@ -382,7 +354,8 @@ add about 22 MB to the binary.
   about 49 MB, static binary on Alpine, uid 65532) behind
   Caddy for TLS. Volumes: `/pb_data` (PocketBase data next to the binary,
   so admin commands need no `--dir`) and `/files` for local-disk storage.
-  The only setting is `NEXUS_ENC_KEY`; no public-URL setting is needed,
+  The container passes `scripts/probe.sh` and keeps its data across a
+  restart. The only setting is `NEXUS_ENC_KEY`; no public-URL setting is needed,
   because the account page takes the address from `Host` and
   `X-Forwarded-Proto`.
 - **Behind a proxy**, PocketBase's "IP proxy headers" setting must name
@@ -390,23 +363,6 @@ add about 22 MB to the binary.
   failed-sign-in limit (§6). Nexus logs a warning once when a proxied
   request arrives without it. Checked with Caddy, whose defaults otherwise
   suit WebDAV (`Host` passed through, unlimited streamed bodies).
-
-### Phase 4 steps
-
-Conditional updates were already done in phases 2 and 3 (`If-Match` /
-`If-None-Match` on CalDAV, CardDAV and files, with tests).
-
-- **4a (done).** Request logs that answer "why isn't my phone syncing?", and a
-  tested backup-and-restore round trip.
-- **4b (done).** Docker image and a deployment guide for Caddy (volumes,
-  key, trusted-proxy setting, restore procedure, logs). The container
-  passed `probe.sh` 32/32 directly and survived a restart.
-- **4c (done).** Real clients. **Thunderbird 160: done**: discovery
-  from just the server address, and create, edit and delete both ways for
-  events and contacts. It
-  found one bug: PUT answered 201 when it replaced an object; it now answers
-  204. DAVx⁵ and Windows Explorer were skipped here and will be
-  checked on the first production deployment.
 
 ## 9. DAV library
 
@@ -455,7 +411,7 @@ scripts/probe.sh end-to-end check of a running server (curl)
 | Question | Status |
 |---|---|
 | Which Go DAV library, and does it cover CalDAV/CardDAV fully? | **Resolved:** a go-webdav copy plus our extensions (§9) |
-| Exact Thunderbird / DAVx⁵ discovery and sign-in behaviour | **Partly done:** Thunderbird checked; DAVx⁵ to be checked in production |
+| Exact Thunderbird / DAVx⁵ discovery and sign-in behaviour | **Partly done:** Thunderbird checked; DAVx⁵ to be checked in production ([CLIENTS.md](CLIENTS.md)) |
 | S3 only, or any rclone backend from day one? | **Proposed:** any backend underneath, UI forms for S3 and local only (§7) |
 | Versioning and conflict behaviour for S3 files | **Proposed:** checked `If-Match`, last writer wins, documented (§7) |
 | Does PocketBase's router pass DAV methods through? | **Resolved** on v0.42.3: yes, once `pbRejectUnknownToken`, `pbCors`, `pbBodyLimit` and `pbLoadAuthToken` are unbound on DAV routes (§3) |

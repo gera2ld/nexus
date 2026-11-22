@@ -1,17 +1,21 @@
 #!/usr/bin/env bash
-# End-to-end probe of a running DAV server: discovery, CRUD, ctag/sync-token,
-# incremental sync-collection, PROPPATCH. Expects a fresh user.
-# Usage: ./probe.sh [base-url]
-# Defaults: alice:test on :8080; for nexus set PROBE_AUTH, PROBE_UID, PROBE_CAL
-# and PROBE_BOOK (see README). Set PROBE_FILES_MOUNT to the name of an empty,
-# writable mount to also check /files (the App Password needs Files access).
+# End-to-end check of a running Nexus server: discovery, CRUD, ctag and
+# sync-token, incremental sync-collection, PROPPATCH, and optionally files.
+# Expects a user whose default calendar and address book are untouched.
+#
+#   PROBE_AUTH='ada@example.com:<app-password>' PROBE_UID=<user id> \
+#     ./scripts/probe.sh [base-url]
+#
+# PROBE_CAL and PROBE_BOOK pick other collections. Set PROBE_FILES_MOUNT to
+# an empty, writable mount to also check /files (the App Password needs
+# Files access). See docs/CLIENTS.md.
 set -u
-BASE=${1:-http://127.0.0.1:8080}
-AUTH=${PROBE_AUTH:-alice:test}
-PUID=${PROBE_UID:-alice}
+BASE=${1:-http://127.0.0.1:8090}
+AUTH=${PROBE_AUTH:?set PROBE_AUTH to email:app-password}
+PUID=${PROBE_UID:?set PROBE_UID to the user id}
 X='Content-Type: application/xml'
-CAL=/dav/$PUID/calendars/${PROBE_CAL:-default}/
-BOOK=/dav/$PUID/contacts/${PROBE_BOOK:-default}/
+CAL=/dav/$PUID/calendars/${PROBE_CAL:-personal}/
+BOOK=/dav/$PUID/contacts/${PROBE_BOOK:-contacts}/
 pass=0 fail=0
 
 check() { # name, haystack, needle

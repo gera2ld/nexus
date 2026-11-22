@@ -1,38 +1,64 @@
 # Nexus
 
-A lightweight, self-hosted personal DAV server. It serves CalDAV, CardDAV and
-WebDAV files from one Go binary with one authentication system, and is built
-for Thunderbird, DAVx⁵ and ordinary WebDAV clients.
+A small self-hosted server for your calendars, contacts and files. One Go
+binary serves CalDAV, CardDAV and WebDAV, with one sign-in for all of
+them.
 
-- [Product design](docs/PRODUCT.md): goals, features, scope, roadmap
-- [Architecture](docs/ARCHITECTURE.md): components, data model, sync, auth,
-  storage, operations
-- [Deploying](docs/DEPLOY.md): Docker image behind Caddy, backups, logs
-- [Vendored DAV library notes](internal/dav/UPSTREAM.md)
+- **Calendars and tasks** (CalDAV) for Thunderbird, DAVx⁵ and other apps.
+- **Contacts** (CardDAV).
+- **Files** (WebDAV) for Finder, rclone and other WebDAV clients, stored on
+  local disk or S3. Each user sees the folders the admin gives them.
+- **App Passwords:** each device gets its own password, limited to
+  calendars, contacts or files, and revocable at any time. Users manage
+  them on their account page.
+- **Admin UI, logs and backups** from [PocketBase](https://pocketbase.io).
 
-## Status
+## Get started
 
-Phases 1–4 are done; v1 is ready to deploy ([docs/DEPLOY.md](docs/DEPLOY.md)).
-CalDAV and CardDAV work end to end on SQLite, and DAV clients sign in with
-an App Password created on the account page. WebDAV files are served at
-`/files/{uid}/` from local disk or S3 through rclone. Tested with
-Thunderbird, rclone and Finder; DAVx⁵ and Windows Explorer will be checked
-on the first production deployment.
+1. Run the Docker image `ghcr.io/gera2ld/nexus` behind your reverse proxy:
+   [docs/DEPLOY.md](docs/DEPLOY.md) covers the image, the encryption key,
+   Caddy, backups and logs.
+2. In the admin UI at `https://dav.example.com/_/`, create a user. There is
+   no public sign-up.
+3. The user signs in at `https://dav.example.com/account` and creates an
+   App Password for each device.
+
+## Connect your apps
+
+**Calendars and contacts:** add a CalDAV or CardDAV account with the server
+address `https://dav.example.com/`, your email and an App Password. The app
+finds your calendars and address books by itself.
+
+- Thunderbird: New Calendar → On the Network; New Address Book → CardDAV.
+- DAVx⁵: Add account → Login with URL and user name.
+
+**Files:** connect to the address shown on your account page,
+`https://dav.example.com/files/<your id>/`, with an App Password that has
+Files access.
+
+- macOS: Finder → Go → Connect to Server.
+- rclone: a `webdav` remote with vendor `other`.
+
+See [docs/CLIENTS.md](docs/CLIENTS.md) for what has been checked with each
+app.
+
+## Limits
+
+- Apps can't create calendars or address books. Each user starts with one
+  of each; add more in the admin UI.
+- File modification times set by apps aren't stored.
+
+## Development
 
 ```bash
 go test ./...
+export NEXUS_ENC_KEY=$(openssl rand -base64 32)  # encrypts storage secrets
 go run ./cmd/nexus superuser upsert admin@example.com <password>
-export NEXUS_ENC_KEY=$(openssl rand -base64 32)  # encrypts storage secrets; keep it safe
-go run ./cmd/nexus serve                 # admin UI at http://127.0.0.1:8090/_/
-# Create a user in the admin UI (there is no public sign-up), then sign in
-# as that user at http://127.0.0.1:8090/account and create an App Password.
-
-# For files, add a storage account (type local) and a mount for the user in
-# the admin UI, and give the App Password Files access.
-
-# Probe nexus as that user (uid = the user's record id, shown in the admin UI;
-# PROBE_FILES_MOUNT is optional and must name an empty, writable mount):
-PROBE_AUTH='user@example.com:<app-password>' PROBE_UID=<uid> PROBE_CAL=personal \
-  PROBE_BOOK=contacts PROBE_FILES_MOUNT=home ./scripts/probe.sh http://127.0.0.1:8090
-./scripts/probe.sh http://127.0.0.1:8080   # end-to-end checks
+go run ./cmd/nexus serve                         # http://127.0.0.1:8090/_/
 ```
+
+`scripts/probe.sh` checks a running server end to end with curl.
+
+- [Product design](docs/PRODUCT.md)
+- [Architecture](docs/ARCHITECTURE.md)
+- [Vendored DAV library notes](internal/dav/UPSTREAM.md)
