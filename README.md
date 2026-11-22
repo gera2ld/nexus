@@ -7,6 +7,7 @@ for Thunderbird, DAVx⁵ and ordinary WebDAV clients.
 - [Product design](docs/PRODUCT.md): goals, features, scope, roadmap
 - [Architecture](docs/ARCHITECTURE.md): components, data model, sync, auth,
   storage, operations
+- [Deploying](docs/DEPLOY.md): Docker image behind Caddy, backups, logs
 - [Vendored DAV library notes](internal/dav/UPSTREAM.md)
 
 ## Status

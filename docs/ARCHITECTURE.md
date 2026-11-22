@@ -378,10 +378,18 @@ add about 22 MB to the binary.
     separately, for the same reason as rclone's S3 backend.
   - File contents on mounts are not in the backup. Back them up with the
     provider's versioning or an `rclone sync` to a second bucket.
-- **Deployment:** one container image. It has a data volume (the PocketBase
-  `pb_data` folder: SQLite, backups, logs) and config set through environment
-  variables (`NEXUS_ENC_KEY`, listen address, public URL). A local-disk
-  storage account needs its own volume.
+- **Deployment** ([DEPLOY.md](DEPLOY.md)): one container image (`Dockerfile`,
+  about 49 MB, static binary on Alpine, uid 65532) behind
+  Caddy for TLS. Volumes: `/pb_data` (PocketBase data next to the binary,
+  so admin commands need no `--dir`) and `/files` for local-disk storage.
+  The only setting is `NEXUS_ENC_KEY`; no public-URL setting is needed,
+  because the account page takes the address from `Host` and
+  `X-Forwarded-Proto`.
+- **Behind a proxy**, PocketBase's "IP proxy headers" setting must name
+  `X-Forwarded-For`, or every client shares the proxy's address for the
+  failed-sign-in limit (§6). Nexus logs a warning once when a proxied
+  request arrives without it. Checked with Caddy, whose defaults otherwise
+  suit WebDAV (`Host` passed through, unlimited streamed bodies).
 
 ### Phase 4 steps
 
@@ -390,8 +398,9 @@ Conditional updates were already done in phases 2 and 3 (`If-Match` /
 
 - **4a (done).** Request logs that answer "why isn't my phone syncing?", and a
   tested backup-and-restore round trip.
-- **4b.** Docker image and a deployment guide (volumes, environment, reverse
-  proxy and trusted-proxy settings, TLS, restore procedure).
+- **4b (done).** Docker image and a deployment guide for Caddy (volumes,
+  key, trusted-proxy setting, restore procedure, logs). The container
+  passed `probe.sh` 32/32 directly and survived a restart.
 - **4c.** Real clients: Thunderbird (on the dev Mac); DAVx⁵ and Windows
   Explorer need the user's phone and a Windows machine.
 

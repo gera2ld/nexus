@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"ganigeorgiev.com/pocketbase/pocketbase/apis"
@@ -126,7 +127,15 @@ func RegisterRoutes(r *router.Router[*core.RequestEvent], dav http.Handler) {
 		return e.Redirect(http.StatusMovedPermanently, files.Prefix+"/")
 	}).Unbind(davUnbind...)
 
+	var warnProxy sync.Once
 	serve := func(e *core.RequestEvent) error {
+		if e.Request.Header.Get("X-Forwarded-For") != "" && len(e.App.Settings().TrustedProxy.Headers) == 0 {
+			warnProxy.Do(func() {
+				e.App.Logger().Warn("nexus: requests arrive through a reverse proxy, but no trusted proxy " +
+					"headers are set (Settings → Application → IP proxy headers). All clients share " +
+					"the proxy's address, so one client's failed sign-ins block every client. See docs/DEPLOY.md.")
+			})
+		}
 		ctx, meta := auth.WithLogMeta(auth.WithClientIP(e.Request.Context(), e.RealIP()))
 		if d := e.Request.Header.Get("Depth"); d != "" {
 			meta["depth"] = d
