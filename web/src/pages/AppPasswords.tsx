@@ -3,7 +3,7 @@ import { useState, type FormEvent } from "react";
 import { api, unwrap, type AppPassword } from "@/api/client";
 import { Confirm } from "@/components/Confirm";
 import { CopyField } from "@/components/CopyField";
-import { Loading, PageHeader } from "@/components/Layout";
+import { Loading, SectionHeader } from "@/components/Layout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -48,7 +48,7 @@ export function AppPasswords() {
 
   return (
     <>
-      <PageHeader
+      <SectionHeader
         title="App Passwords"
         description="Each app or device gets its own password, limited to what it needs. Revoking one stops only that app."
       >
@@ -60,7 +60,7 @@ export function AppPasswords() {
         >
           <Plus /> New App Password
         </Button>
-      </PageHeader>
+      </SectionHeader>
 
       {shown.length === 0 ? (
         <p className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">

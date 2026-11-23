@@ -1,4 +1,4 @@
-import { LogOut, type LucideIcon } from "lucide-react";
+import { LogOut, Settings, type LucideIcon } from "lucide-react";
 import { Link, NavLink, Outlet, useLocation } from "react-router";
 import { avatarURL, type Account } from "@/api/client";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -20,12 +20,15 @@ export function Layout({
   home,
   nav,
   extra,
+  settings,
 }: {
   title: string;
   /** Where the title links to. */
   home: string;
   nav: NavItem[];
   extra?: React.ReactNode;
+  /** The settings page, linked from the account menu. */
+  settings?: string;
 }) {
   const { signOut, account } = useAuth();
   // The Files page fills the window: its tree and content scroll on their own.
@@ -34,7 +37,7 @@ export function Layout({
   return (
     <div className={fill ? "flex h-svh flex-col" : "min-h-svh"}>
       <header className="shrink-0 border-b">
-        <div className={cn("mx-auto flex flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3", width)}>
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
           <Link to={home} className="flex items-center gap-2 font-semibold">
             <img src={`${import.meta.env.BASE_URL}favicon.svg`} alt="" className="size-6" />
             {title}
@@ -59,7 +62,7 @@ export function Layout({
           </nav>
           <div className="ml-auto flex items-center gap-3 text-sm text-muted-foreground">
             {extra}
-            {account && <AccountMenu account={account} onSignOut={signOut} />}
+            {account && <AccountMenu account={account} settings={settings} onSignOut={signOut} />}
           </div>
         </div>
       </header>
@@ -76,7 +79,7 @@ function initials(a: Account) {
   return (words.length ? words.slice(0, 2).map((w) => w[0]) : [a.email[0]]).join("").toUpperCase();
 }
 
-function AccountMenu({ account, onSignOut }: { account: Account; onSignOut: () => void }) {
+function AccountMenu({ account, settings, onSignOut }: { account: Account; settings?: string; onSignOut: () => void }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
@@ -94,11 +97,31 @@ function AccountMenu({ account, onSignOut }: { account: Account; onSignOut: () =
           <div className="text-sm break-all text-muted-foreground">{account.email}</div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
+        {settings && (
+          <DropdownMenuItem asChild>
+            <Link to={settings}>
+              <Settings /> Settings
+            </Link>
+          </DropdownMenuItem>
+        )}
         <DropdownMenuItem onSelect={onSignOut}>
           <LogOut /> Sign out
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
+  );
+}
+
+/** A titled section of a page, with optional actions on the right. */
+export function SectionHeader({ title, description, children }: { title: string; description?: string; children?: React.ReactNode }) {
+  return (
+    <div className="mb-4 flex flex-wrap items-end justify-between gap-4">
+      <div>
+        <h2 className="text-lg font-semibold">{title}</h2>
+        {description && <p className="mt-1 max-w-prose text-sm text-muted-foreground">{description}</p>}
+      </div>
+      {children}
+    </div>
   );
 }
 

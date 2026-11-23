@@ -27,9 +27,9 @@ Product scope: [PRODUCT.md](PRODUCT.md) §3.5. Server architecture:
 
 ```
 /                             user dashboard: overview
-/account/app-passwords        App Passwords
 /account/calendars            calendars
 /account/contacts             address books
+/account/settings             settings: App Passwords (from the account menu)
 /account/shares               share links
 /admin                        admin dashboard: storage accounts
 /admin/mounts                 mounts
@@ -79,7 +79,9 @@ Product scope: [PRODUCT.md](PRODUCT.md) §3.5. Server architecture:
 
 - **Overview** (`/`, opened from the Nexus name in the header): server address for calendar and contacts apps, the files
   address, the user's mounts.
-- **App Passwords:** create; edit name, scopes and paths in place; revoke.
+- **Header:** full width on every page. The account menu (avatar) holds
+  Settings and Sign out.
+- **App Passwords** (on Settings): create; edit name, scopes and paths in place; revoke.
   The secret is shown once, at creation. Path rules are as now
   (ARCHITECTURE §6), including pasted addresses with the user id.
 - **Calendars and address books:** list, create (name, colour, events

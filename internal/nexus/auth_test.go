@@ -594,7 +594,7 @@ func TestAccountPages(t *testing.T) {
 	if first.code != http.StatusOK || !strings.Contains(first.body, "<title>Nexus</title>") {
 		t.Fatalf("/: %d %s", first.code, first.body)
 	}
-	for _, p := range []string{"/account/calendars", "/account/app-passwords", "/admin", "/admin/mounts", "/files", "/files/", "/files/u1/docs/a.txt"} {
+	for _, p := range []string{"/account/calendars", "/account/settings", "/admin", "/admin/mounts", "/files", "/files/", "/files/u1/docs/a.txt"} {
 		r := s.do("GET", p, nil, nil)
 		if r.code != http.StatusOK || r.body != first.body {
 			t.Errorf("%s: %d, want the app page", p, r.code)

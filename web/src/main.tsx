@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { CalendarDays, Contact, ExternalLink, FolderOpen, HardDrive, KeyRound, Users } from "lucide-react";
+import { CalendarDays, Contact, ExternalLink, FolderOpen, HardDrive, Users } from "lucide-react";
 import { createBrowserRouter, RouterProvider } from "react-router";
 import { ApiError, realm } from "@/api/client";
 import { Layout, Loading, NotFound, type NavItem } from "@/components/Layout";
@@ -9,7 +9,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { Mounts } from "@/pages/admin/Mounts";
 import { Storage } from "@/pages/admin/Storage";
-import { AppPasswords } from "@/pages/AppPasswords";
+import { Settings } from "@/pages/Settings";
 import { Files } from "@/pages/files/Files";
 import { Collections } from "@/pages/Collections";
 import { Overview } from "@/pages/Overview";
@@ -28,7 +28,6 @@ const queryClient = new QueryClient({
 
 const accountNav: NavItem[] = [
   { to: "/files", label: "Files", icon: FolderOpen },
-  { to: "/account/app-passwords", label: "App Passwords", icon: KeyRound },
   { to: "/account/calendars", label: "Calendars", icon: CalendarDays },
   { to: "/account/contacts", label: "Contacts", icon: Contact },
 ];
@@ -53,10 +52,10 @@ const router = createBrowserRouter(
         {
           // The overview is the home page; the rest live under /account.
           path: "/",
-          element: <Layout title="Nexus" home="/" nav={accountNav} />,
+          element: <Layout title="Nexus" home="/" nav={accountNav} settings="/account/settings" />,
           children: [
             { index: true, element: <Overview /> },
-            { path: "account/app-passwords", element: <AppPasswords /> },
+            { path: "account/settings", element: <Settings /> },
             { path: "account/calendars", element: <Collections key="calendars" kind="calendars" /> },
             { path: "account/contacts", element: <Collections key="addressbooks" kind="addressbooks" /> },
             // /files shows the mounts too, so there's nothing to redirect.
