@@ -83,17 +83,21 @@ export function AppPasswords() {
                 <TableRow key={p.id} className={p.revokedAt ? "text-muted-foreground" : undefined}>
                   <TableCell className="font-medium">
                     {p.label}
-                    {p.revokedAt && <Badge variant="outline" className="ml-2">Revoked</Badge>}
+                    {p.revokedAt && (
+                      <Badge variant="outline" className="ml-2">
+                        Revoked
+                      </Badge>
+                    )}
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-1">
                       {p.scopes.map((s) => (
-                        <Badge key={s} variant="secondary">{scopeNames[s]}</Badge>
+                        <Badge key={s} variant="secondary">
+                          {scopeNames[s]}
+                        </Badge>
                       ))}
                     </div>
-                    {p.paths.length > 0 && (
-                      <div className="mt-1 font-mono text-xs text-muted-foreground">only {p.paths.join(", ")}</div>
-                    )}
+                    {p.paths.length > 0 && <div className="mt-1 font-mono text-xs text-muted-foreground">only {p.paths.join(", ")}</div>}
                   </TableCell>
                   <TableCell className="hidden md:table-cell">{formatDate(p.created)}</TableCell>
                   <TableCell className="hidden md:table-cell">{p.lastUsedAt ? formatDate(p.lastUsedAt) : "Never"}</TableCell>
@@ -110,7 +114,9 @@ export function AppPasswords() {
                         >
                           Edit
                         </Button>
-                        <Button variant="ghost" size="sm" className="text-destructive" onClick={() => setRevoking(p)}>Revoke</Button>
+                        <Button variant="ghost" size="sm" className="text-destructive" onClick={() => setRevoking(p)}>
+                          Revoke
+                        </Button>
                       </>
                     )}
                   </TableCell>
@@ -173,9 +179,15 @@ export function AppPasswords() {
             <DialogDescription>Copy the password into the app now. It won't be shown again.</DialogDescription>
           </DialogHeader>
           <div className="grid gap-3 text-sm">
-            <Field label="Server"><CopyField value={me.data?.server ?? ""} label="Server address" /></Field>
-            <Field label="User name"><CopyField value={me.data?.email ?? ""} label="User name" /></Field>
-            <Field label="Password"><CopyField value={created?.secret ?? ""} label="Password" /></Field>
+            <Field label="Server">
+              <CopyField value={me.data?.server ?? ""} label="Server address" />
+            </Field>
+            <Field label="User name">
+              <CopyField value={me.data?.email ?? ""} label="User name" />
+            </Field>
+            <Field label="Password">
+              <CopyField value={created?.secret ?? ""} label="Password" />
+            </Field>
           </div>
           <DialogFooter>
             <Button onClick={() => setCreated(null)}>Done</Button>
@@ -229,7 +241,15 @@ function PasswordForm(props: {
           </DialogHeader>
           <div className="grid gap-2">
             <Label htmlFor="pw-label">Name</Label>
-            <Input id="pw-label" name="label" defaultValue={props.initial.label} placeholder="e.g. Phone, Laptop Thunderbird" required maxLength={100} autoFocus />
+            <Input
+              id="pw-label"
+              name="label"
+              defaultValue={props.initial.label}
+              placeholder="e.g. Phone, Laptop Thunderbird"
+              required
+              maxLength={100}
+              autoFocus
+            />
           </div>
           <fieldset className="grid gap-2">
             <legend className="mb-2 text-sm font-medium">Can use</legend>
@@ -254,8 +274,8 @@ function PasswordForm(props: {
               rows={3}
             />
             <p className="text-xs text-muted-foreground">
-              One per line, under /files/, /calendars/ or /contacts/. A /dav prefix is removed. Leave empty to allow
-              everything the boxes above allow.
+              One per line, under /files/, /calendars/ or /contacts/. A /dav prefix is removed. Leave empty to allow everything the boxes
+              above allow.
             </p>
           </div>
           {props.error && (
@@ -264,8 +284,12 @@ function PasswordForm(props: {
             </p>
           )}
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => props.onOpenChange(false)}>Cancel</Button>
-            <Button type="submit" disabled={props.busy || scopes.length === 0}>{props.submit}</Button>
+            <Button type="button" variant="outline" onClick={() => props.onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={props.busy || scopes.length === 0}>
+              {props.submit}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

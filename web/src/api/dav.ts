@@ -102,7 +102,7 @@ export async function list(p: string): Promise<Entry[]> {
   if (r.status !== 207) await fail(r, "Couldn't list this folder");
   return parseMultistatus(await r.text())
     .filter((e) => e.path !== p)
-    .sort((a, b) => Number(b.dir) - Number(a.dir) || a.name.localeCompare(b.name, undefined, { numeric: true }));
+    .toSorted((a, b) => Number(b.dir) - Number(a.dir) || a.name.localeCompare(b.name, undefined, { numeric: true }));
 }
 
 /** One file's or folder's properties. */
@@ -160,14 +160,14 @@ export function upload(p: string, file: File, onProgress: (fraction: number) => 
     const x = new XMLHttpRequest();
     x.open("PUT", rawPath(p));
     x.setRequestHeader("Authorization", `Bearer ${token.get()}`);
-    x.upload.onprogress = (e) => e.lengthComputable && onProgress(e.loaded / e.total);
-    x.onload = () => {
+    x.upload.addEventListener("progress", (e) => e.lengthComputable && onProgress(e.loaded / e.total));
+    x.addEventListener("load", () => {
       if (x.status === 401) onUnauthorized();
       if (x.status >= 200 && x.status < 300) resolve();
       else reject(new DavError(`Couldn't upload ${file.name}: ${x.responseText.trim() || x.statusText}`, x.status));
-    };
-    x.onerror = () => reject(new DavError(`Couldn't upload ${file.name}: the connection failed.`, 0));
-    x.onabort = () => reject(new DavError(`Upload of ${file.name} cancelled.`, 0));
+    });
+    x.addEventListener("error", () => reject(new DavError(`Couldn't upload ${file.name}: the connection failed.`, 0)));
+    x.addEventListener("abort", () => reject(new DavError(`Upload of ${file.name} cancelled.`, 0)));
     signal?.addEventListener("abort", () => x.abort());
     x.send(file);
   });

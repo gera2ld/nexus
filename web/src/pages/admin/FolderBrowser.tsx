@@ -49,11 +49,26 @@ export function FolderBrowser(props: {
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="flex gap-2">
-          <Button type="button" variant="outline" size="icon" aria-label="Up one folder" disabled={atTop} onClick={() => go(parentPath(account.type, shown))}>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            aria-label="Up one folder"
+            disabled={atTop}
+            onClick={() => go(parentPath(account.type, shown))}
+          >
             <ArrowUp />
           </Button>
-          <Input value={typed} onChange={(e) => setTyped(e.target.value)} className="font-mono" aria-label="Path" placeholder={account.type === "s3" ? "bucket/prefix" : "/"} />
-          <Button type="submit" variant="outline">Go</Button>
+          <Input
+            value={typed}
+            onChange={(e) => setTyped(e.target.value)}
+            className="font-mono"
+            aria-label="Path"
+            placeholder={account.type === "s3" ? "bucket/prefix" : "/"}
+          />
+          <Button type="submit" variant="outline">
+            Go
+          </Button>
         </form>
         <div className="h-80 overflow-y-auto rounded-md border">
           {list.isPending ? (
@@ -70,7 +85,11 @@ export function FolderBrowser(props: {
               {list.data.entries.map((e) => (
                 <li key={e.name}>
                   {e.dir ? (
-                    <button type="button" className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-accent" onClick={() => go(joinPath(account.type, shown, e.name))}>
+                    <button
+                      type="button"
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-accent"
+                      onClick={() => go(joinPath(account.type, shown, e.name))}
+                    >
                       <Folder className="size-4 shrink-0 text-muted-foreground" />
                       <span className="truncate">{e.name}</span>
                     </button>
@@ -88,7 +107,9 @@ export function FolderBrowser(props: {
           )}
         </div>
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={props.onClose}>{props.onPick ? "Cancel" : "Close"}</Button>
+          <Button type="button" variant="outline" onClick={props.onClose}>
+            {props.onPick ? "Cancel" : "Close"}
+          </Button>
           {props.onPick && (
             <Button type="button" disabled={!list.data || (atTop && account.type === "local")} onClick={() => props.onPick!(shown)}>
               Use this folder

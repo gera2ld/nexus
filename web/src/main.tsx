@@ -82,7 +82,12 @@ const router = createBrowserRouter(
 
 function App() {
   const { signedIn } = useAuth();
-  if (signedIn === null) return <div className="p-6"><Loading /></div>;
+  if (signedIn === null)
+    return (
+      <div className="p-6">
+        <Loading />
+      </div>
+    );
   if (!signedIn) return <SignIn />;
   return <RouterProvider router={router} />;
 }

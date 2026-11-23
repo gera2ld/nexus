@@ -32,17 +32,25 @@ export function Mounts() {
   const noAccounts = accounts.data.length === 0;
   return (
     <>
-      <PageHeader title="Mounts" description="Each mount is a folder a user sees in Files. Removing a mount leaves the files where they are.">
+      <PageHeader
+        title="Mounts"
+        description="Each mount is a folder a user sees in Files. Removing a mount leaves the files where they are."
+      >
         <Button onClick={() => setCreating(true)} disabled={noAccounts}>
           <Plus /> New mount
         </Button>
       </PageHeader>
       {noAccounts ? (
         <p className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-          Mounts need a storage account. <Link to="/admin" className="underline underline-offset-4">Add one first.</Link>
+          Mounts need a storage account.{" "}
+          <Link to="/admin" className="underline underline-offset-4">
+            Add one first.
+          </Link>
         </p>
       ) : list.data.length === 0 ? (
-        <p className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">No mounts yet. Users see no files until they have one.</p>
+        <p className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
+          No mounts yet. Users see no files until they have one.
+        </p>
       ) : (
         <div className="rounded-lg border">
           <Table>
@@ -57,18 +65,28 @@ export function Mounts() {
             <TableBody>
               {list.data.map((m, i) => (
                 <TableRow key={m.id}>
-                  <TableCell className={i > 0 && list.data[i - 1].user.id === m.user.id ? "text-muted-foreground/60" : undefined}>{m.user.email}</TableCell>
+                  <TableCell className={i > 0 && list.data[i - 1].user.id === m.user.id ? "text-muted-foreground/60" : undefined}>
+                    {m.user.email}
+                  </TableCell>
                   <TableCell>
                     <span className="font-mono">{m.name}</span>
-                    {m.readOnly && <Badge variant="outline" className="ml-2">read-only</Badge>}
+                    {m.readOnly && (
+                      <Badge variant="outline" className="ml-2">
+                        read-only
+                      </Badge>
+                    )}
                   </TableCell>
                   <TableCell className="max-w-64 whitespace-normal">
                     <div>{m.account.name}</div>
                     <div className="font-mono text-xs break-all text-muted-foreground">{m.remotePath || "all buckets"}</div>
                   </TableCell>
                   <TableCell className="text-right whitespace-nowrap">
-                    <Button variant="ghost" size="sm" onClick={() => setEditing(m)}>Edit</Button>
-                    <Button variant="ghost" size="sm" className="text-destructive" onClick={() => setDeleting(m)}>Remove</Button>
+                    <Button variant="ghost" size="sm" onClick={() => setEditing(m)}>
+                      Edit
+                    </Button>
+                    <Button variant="ghost" size="sm" className="text-destructive" onClick={() => setDeleting(m)}>
+                      Remove
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))}
@@ -105,7 +123,12 @@ function MountForm({ mount, onClose }: { mount?: AdminMount; onClose: () => void
   const save = useAction(
     () =>
       mount
-        ? unwrap(api.PATCH("/admin/mounts/{id}", { params: { path: { id: mount.id } }, body: { name: name.trim(), account: accountId, remotePath, readOnly } }))
+        ? unwrap(
+            api.PATCH("/admin/mounts/{id}", {
+              params: { path: { id: mount.id } },
+              body: { name: name.trim(), account: accountId, remotePath, readOnly },
+            }),
+          )
         : unwrap(api.POST("/admin/mounts", { body: { user: userId, name: name.trim(), account: accountId, remotePath, readOnly } })),
     ["mounts", "storage-accounts"],
     mount ? "Mount saved" : "Mount created",
@@ -129,9 +152,13 @@ function MountForm({ mount, onClose }: { mount?: AdminMount; onClose: () => void
               <div className="grid gap-2">
                 <Label htmlFor="m-user">User</Label>
                 <NativeSelect id="m-user" required value={userId} onChange={(e) => setUserId(e.target.value)}>
-                  <option value="" disabled>{users.data ? "Choose a user…" : "Loading…"}</option>
+                  <option value="" disabled>
+                    {users.data ? "Choose a user…" : "Loading…"}
+                  </option>
                   {users.data?.map((u) => (
-                    <option key={u.id} value={u.id}>{u.name ? `${u.name} <${u.email}>` : u.email}</option>
+                    <option key={u.id} value={u.id}>
+                      {u.name ? `${u.name} <${u.email}>` : u.email}
+                    </option>
                   ))}
                 </NativeSelect>
               </div>
@@ -149,7 +176,9 @@ function MountForm({ mount, onClose }: { mount?: AdminMount; onClose: () => void
                 className="font-mono"
                 placeholder="docs"
               />
-              <p className="text-xs text-muted-foreground">Lower-case letters, digits, dot, underscore and hyphen. Renaming it changes the address apps use.</p>
+              <p className="text-xs text-muted-foreground">
+                Lower-case letters, digits, dot, underscore and hyphen. Renaming it changes the address apps use.
+              </p>
             </div>
             <div className="grid gap-2">
               <Label htmlFor="m-account">Storage account</Label>
@@ -176,8 +205,8 @@ function MountForm({ mount, onClose }: { mount?: AdminMount; onClose: () => void
               </div>
               {account?.type === "s3" && (
                 <p className="text-xs text-muted-foreground">
-                  bucket or bucket/prefix. Empty shows every bucket the account can list, and folders at the top are buckets:
-                  creating or deleting one there creates or deletes a bucket.
+                  bucket or bucket/prefix. Empty shows every bucket the account can list, and folders at the top are buckets: creating or
+                  deleting one there creates or deletes a bucket.
                 </p>
               )}
             </div>
@@ -186,8 +215,12 @@ function MountForm({ mount, onClose }: { mount?: AdminMount; onClose: () => void
               Read-only
             </Label>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-              <Button type="submit" disabled={save.isPending}>{mount ? "Save" : "Create"}</Button>
+              <Button type="button" variant="outline" onClick={onClose}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={save.isPending}>
+                {mount ? "Save" : "Create"}
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>

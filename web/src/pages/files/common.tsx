@@ -26,7 +26,9 @@ export function Crumbs({ path }: { path: string }) {
   return (
     <nav aria-label="Folder" className="flex min-w-0 flex-wrap items-center gap-1 text-sm">
       {parts.length ? (
-        <Link to={link("/")} className="text-muted-foreground hover:text-foreground">Files</Link>
+        <Link to={link("/")} className="text-muted-foreground hover:text-foreground">
+          Files
+        </Link>
       ) : (
         <span className="font-medium">Files</span>
       )}
@@ -39,7 +41,9 @@ export function Crumbs({ path }: { path: string }) {
             {last ? (
               <span className="font-medium break-all">{name}</span>
             ) : (
-              <Link to={link(to)} className="break-all text-muted-foreground hover:text-foreground">{name}</Link>
+              <Link to={link(to)} className="break-all text-muted-foreground hover:text-foreground">
+                {name}
+              </Link>
             )}
           </Fragment>
         );

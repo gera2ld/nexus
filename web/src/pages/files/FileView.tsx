@@ -38,7 +38,8 @@ function kindOf(e: Entry): Kind {
   if (t.startsWith("video/")) return "video";
   if (t.startsWith("audio/")) return "audio";
   if (t === "application/pdf") return "pdf";
-  if (t.startsWith("text/") || /[/+](json|xml|yaml|toml|javascript|ecmascript|x-sh|x-shellscript|sql|graphql|x-ndjson)$/.test(t)) return "text";
+  if (t.startsWith("text/") || /[/+](json|xml|yaml|toml|javascript|ecmascript|x-sh|x-shellscript|sql|graphql|x-ndjson)$/.test(t))
+    return "text";
   return "unknown";
 }
 
@@ -50,7 +51,15 @@ export function FileView({ path }: { path: string }) {
     return (
       <>
         <Crumbs path={path} />
-        <div className="mt-4">{st.error ? <p role="alert" className="text-sm text-destructive">{st.error.message}</p> : <Loading />}</div>
+        <div className="mt-4">
+          {st.error ? (
+            <p role="alert" className="text-sm text-destructive">
+              {st.error.message}
+            </p>
+          ) : (
+            <Loading />
+          )}
+        </div>
       </>
     );
   }
@@ -65,9 +74,15 @@ export function FileView({ path }: { path: string }) {
       <FileHeader entry={e} />
       {/* Absolute children take the box's size: shrunk to fit, never enlarged. */}
       <div className="relative grid min-h-80 flex-1 place-items-center rounded-lg border bg-muted/30 p-4">
-        {kind === "image" && <img src={src} alt={e.name} className="absolute inset-4 m-auto max-h-[calc(100%-2rem)] max-w-[calc(100%-2rem)]" />}
-        {kind === "video" && <video src={src} controls className="absolute inset-4 m-auto max-h-[calc(100%-2rem)] max-w-[calc(100%-2rem)]" />}
+        {kind === "image" && (
+          <img src={src} alt={e.name} className="absolute inset-4 m-auto max-h-[calc(100%-2rem)] max-w-[calc(100%-2rem)]" />
+        )}
+        {kind === "video" && (
+          <video src={src} controls className="absolute inset-4 m-auto max-h-[calc(100%-2rem)] max-w-[calc(100%-2rem)]" />
+        )}
         {kind === "audio" && <audio src={src} controls className="w-full max-w-xl" />}
+        {/* Not sandboxed: Chrome's PDF viewer won't run in a sandbox (docs/WEB.md). */}
+        {/* oxlint-disable-next-line react/iframe-missing-sandbox */}
         {kind === "pdf" && <iframe src={src} title={e.name} className="absolute inset-0 size-full rounded-lg bg-white" />}
       </div>
     </>
@@ -105,16 +120,15 @@ function NoPreview({ entry, why }: { entry: Entry; why: string }) {
   );
 }
 
-type Loaded =
-  | { ok: true; text: string; etag: string }
-  | { ok: false; why: string; text?: undefined; etag?: undefined };
+type Loaded = { ok: true; text: string; etag: string } | { ok: false; why: string; text?: undefined; etag?: undefined };
 
 async function load(e: Entry, sniff: boolean): Promise<Loaded> {
   if (sniff && e.size > 0) {
     const head = await readText(e.path, SNIFF_BYTES);
     if (head.bytes.includes(0)) return { ok: false, why: "No preview for this kind of file." };
   }
-  if (e.size > OPEN_LIMIT) return { ok: false, why: `This file is too large to open here (${formatSize(e.size)}). Open it with Raw instead.` };
+  if (e.size > OPEN_LIMIT)
+    return { ok: false, why: `This file is too large to open here (${formatSize(e.size)}). Open it with Raw instead.` };
   const { bytes, etag } = await readText(e.path);
   try {
     return { ok: true, text: new TextDecoder("utf-8", { fatal: true }).decode(bytes), etag };
@@ -133,25 +147,62 @@ function TextFile({ entry: e, sniff }: { entry: Entry; sniff: boolean }) {
     void qc.invalidateQueries({ queryKey: ["dav-stat", e.path] });
     void qc.invalidateQueries({ queryKey: ["dav", parentOf(e.path)] });
   };
-  const q = useQuery({ queryKey: ["dav-text", e.path], queryFn: () => load(e, sniff), retry: false, gcTime: 0, staleTime: Infinity, structuralSharing: false });
+  const q = useQuery({
+    queryKey: ["dav-text", e.path],
+    queryFn: () => load(e, sniff),
+    retry: false,
+    gcTime: 0,
+    staleTime: Infinity,
+    structuralSharing: false,
+  });
 
-  const [etag, setEtag] = useState("");
-  const [saved, setSaved] = useState("");
-  const draft = useRef("");
+  if (!q.data) {
+    return (
+      <>
+        <FileHeader entry={e} />
+        {q.error ? (
+          <p role="alert" className="text-sm text-destructive">
+            {q.error.message}
+          </p>
+        ) : (
+          <Loading />
+        )}
+      </>
+    );
+  }
+  if (!q.data.ok) return <NoPreview entry={e} why={q.data.why} />;
+  // Each load starts a fresh editor with that load's text and ETag.
+  return (
+    <TextEditor
+      key={q.dataUpdatedAt}
+      entry={e}
+      loaded={q.data}
+      readOnly={readOnly}
+      tooBig={tooBig && !mountReadOnly}
+      refreshInfo={refreshInfo}
+      reload={() => {
+        void q.refetch();
+        refreshInfo();
+      }}
+    />
+  );
+}
+
+function TextEditor(props: {
+  entry: Entry;
+  loaded: { text: string; etag: string };
+  readOnly: boolean;
+  tooBig: boolean;
+  refreshInfo: () => void;
+  reload: () => void;
+}) {
+  const { entry: e, readOnly, refreshInfo } = props;
+  const [etag, setEtag] = useState(props.loaded.etag);
+  const [saved, setSaved] = useState(props.loaded.text);
+  const draft = useRef(props.loaded.text);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [conflict, setConflict] = useState(false);
-  // Each load from the server starts a fresh editor.
-  const [generation, setGeneration] = useState(0);
-
-  useEffect(() => {
-    if (!q.data?.ok) return;
-    setEtag(q.data.etag);
-    setSaved(q.data.text);
-    draft.current = q.data.text;
-    setDirty(false);
-    setGeneration((g) => g + 1);
-  }, [q.data]);
 
   // Unsaved changes: ask before leaving the page or the app's route.
   useEffect(() => {
@@ -180,16 +231,6 @@ function TextFile({ entry: e, sniff }: { entry: Entry; sniff: boolean }) {
     }
   };
 
-  if (!q.data) {
-    return (
-      <>
-        <FileHeader entry={e} />
-        {q.error ? <p role="alert" className="text-sm text-destructive">{q.error.message}</p> : <Loading />}
-      </>
-    );
-  }
-  if (!q.data.ok) return <NoPreview entry={e} why={q.data.why} />;
-
   return (
     <>
       <FileHeader entry={e}>
@@ -199,13 +240,12 @@ function TextFile({ entry: e, sniff }: { entry: Entry; sniff: boolean }) {
           </Button>
         )}
       </FileHeader>
-      {tooBig && !mountReadOnly && (
+      {props.tooBig && (
         <p className="mb-3 text-sm text-muted-foreground">This file is over {formatSize(EDIT_LIMIT)}, so it opens read-only.</p>
       )}
       <div className="min-h-80 flex-1 overflow-hidden rounded-lg border">
         <Suspense fallback={<p className="p-4 text-sm text-muted-foreground">Loading the editor…</p>}>
           <Editor
-            key={generation}
             name={e.name}
             value={saved}
             readOnly={readOnly}
@@ -223,8 +263,8 @@ function TextFile({ entry: e, sniff }: { entry: Entry; sniff: boolean }) {
           <AlertDialogHeader>
             <AlertDialogTitle>The file changed on the server</AlertDialogTitle>
             <AlertDialogDescription>
-              Someone or something saved {e.name} after you opened it. Reload to get their version and lose your changes, or overwrite it with
-              yours.
+              Someone or something saved {e.name} after you opened it. Reload to get their version and lose your changes, or overwrite it
+              with yours.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -233,8 +273,7 @@ function TextFile({ entry: e, sniff }: { entry: Entry; sniff: boolean }) {
               variant="outline"
               onClick={() => {
                 setConflict(false);
-                void q.refetch();
-                refreshInfo();
+                props.reload();
               }}
             >
               Reload

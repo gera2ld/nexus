@@ -31,7 +31,10 @@ export function Storage() {
   if (!list.data) return <Loading error={list.error} />;
   return (
     <>
-      <PageHeader title="Storage" description="Where files live. A mount gives one user a folder of a storage account; the same account can back many mounts.">
+      <PageHeader
+        title="Storage"
+        description="Where files live. A mount gives one user a folder of a storage account; the same account can back many mounts."
+      >
         <Button onClick={() => setCreating(true)}>
           <Plus /> New storage account
         </Button>
@@ -73,7 +76,9 @@ export function Storage() {
                   <Button variant="ghost" size="sm" onClick={() => setBrowsing(a)}>
                     <FolderOpen /> Browse
                   </Button>
-                  <Button variant="ghost" size="sm" onClick={() => setEditing(a)}>Edit</Button>
+                  <Button variant="ghost" size="sm" onClick={() => setEditing(a)}>
+                    Edit
+                  </Button>
                   <Button
                     variant="ghost"
                     size="sm"
@@ -114,13 +119,21 @@ type Row = { key: number; name: string; value: string };
  * name and value. Secrets are write-only: an empty field keeps what's
  * stored.
  */
-function AccountForm({ account, onClose, onSaved }: { account?: StorageAccount; onClose: () => void; onSaved?: (a: StorageAccount) => void }) {
+function AccountForm({
+  account,
+  onClose,
+  onSaved,
+}: {
+  account?: StorageAccount;
+  onClose: () => void;
+  onSaved?: (a: StorageAccount) => void;
+}) {
   const [type, setType] = useState<Type>((account?.type as Type) ?? "s3");
   const options = useStorageOptions(type);
   const byName = useMemo(() => new Map((options.data ?? []).map((o) => [o.name, o])), [options.data]);
   const basic = (options.data ?? []).filter((o) => !o.advanced);
 
-  const [values, setValues] = useState<Record<string, string>>(() => ({ ...(account?.options ?? {}) }));
+  const [values, setValues] = useState<Record<string, string>>(() => ({ ...account?.options }));
   const [secrets, setSecrets] = useState<Record<string, string>>({}); // new values; "" on a stored one removes it
   const stored = new Set(account?.secrets ?? []);
   const provider = values.provider ?? "";
@@ -145,7 +158,9 @@ function AccountForm({ account, onClose, onSaved }: { account?: StorageAccount; 
 
   function setValue(name: string, value: string) {
     setValues((v) => ({ ...v, [name]: value }));
-    setRows((rs) => (rs.some((r) => r.name === name) ? rs.map((r) => (r.name === name ? { ...r, value } : r)) : [...rs, { key: Date.now(), name, value }]));
+    setRows((rs) =>
+      rs.some((r) => r.name === name) ? rs.map((r) => (r.name === name ? { ...r, value } : r)) : [...rs, { key: Date.now(), name, value }],
+    );
   }
 
   function submit(e: FormEvent<HTMLFormElement>) {
@@ -184,12 +199,22 @@ function AccountForm({ account, onClose, onSaved }: { account?: StorageAccount; 
           <DialogHeader>
             <DialogTitle>{account ? `Edit ${account.name}` : "New storage account"}</DialogTitle>
             <DialogDescription>
-              {account ? "Mounts on it pick up the change on their next request." : "After saving, Nexus lists the account so you can see the connection works."}
+              {account
+                ? "Mounts on it pick up the change on their next request."
+                : "After saving, Nexus lists the account so you can see the connection works."}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-2">
             <Label htmlFor="acc-name">Name</Label>
-            <Input id="acc-name" name="name" defaultValue={account?.name} required maxLength={100} autoFocus placeholder="e.g. NAS, Backblaze" />
+            <Input
+              id="acc-name"
+              name="name"
+              defaultValue={account?.name}
+              required
+              maxLength={100}
+              autoFocus
+              placeholder="e.g. NAS, Backblaze"
+            />
           </div>
           {!account && (
             <fieldset className="grid gap-2">
@@ -205,7 +230,9 @@ function AccountForm({ account, onClose, onSaved }: { account?: StorageAccount; 
             </fieldset>
           )}
           {type === "local" && (
-            <p className="text-sm text-muted-foreground">Local disk needs no settings. Each mount names an absolute folder on the server.</p>
+            <p className="text-sm text-muted-foreground">
+              Local disk needs no settings. Each mount names an absolute folder on the server.
+            </p>
           )}
           {options.error && <p className="text-sm text-destructive">{options.error.message}</p>}
           {shownBasic.map((o) => (
@@ -225,15 +252,27 @@ function AccountForm({ account, onClose, onSaved }: { account?: StorageAccount; 
             <details className="group rounded-md border px-3 py-2" open={advancedRows.length > 0}>
               <summary className="cursor-pointer text-sm font-medium">Advanced options</summary>
               <div className="mt-3 grid gap-2">
-                <p className="text-xs text-muted-foreground">Any other rclone option for {typeNames[type]}, by name. Secret ones are stored encrypted.</p>
+                <p className="text-xs text-muted-foreground">
+                  Any other rclone option for {typeNames[type]}, by name. Secret ones are stored encrypted.
+                </p>
                 <datalist id={listId}>
-                  {options.data.filter((o) => o.advanced).map((o) => (
-                    <option key={o.name} value={o.name}>{firstLine(o.help)}</option>
-                  ))}
+                  {options.data
+                    .filter((o) => o.advanced)
+                    .map((o) => (
+                      <option key={o.name} value={o.name}>
+                        {firstLine(o.help)}
+                      </option>
+                    ))}
                 </datalist>
                 {advancedRows.map((r) => (
                   <div key={r.key} className="flex gap-2">
-                    <Input aria-label="Option name" list={listId} value={r.name} className="font-mono text-xs" onChange={(e) => setRows((rs) => rs.map((x) => (x.key === r.key ? { ...x, name: e.target.value } : x)))} />
+                    <Input
+                      aria-label="Option name"
+                      list={listId}
+                      value={r.name}
+                      className="font-mono text-xs"
+                      onChange={(e) => setRows((rs) => rs.map((x) => (x.key === r.key ? { ...x, name: e.target.value } : x)))}
+                    />
                     <Input
                       aria-label={`Value of ${r.name || "option"}`}
                       type={byName.get(r.name)?.secret ? "password" : "text"}
@@ -241,31 +280,55 @@ function AccountForm({ account, onClose, onSaved }: { account?: StorageAccount; 
                       className="font-mono text-xs"
                       onChange={(e) => setRows((rs) => rs.map((x) => (x.key === r.key ? { ...x, value: e.target.value } : x)))}
                     />
-                    <Button type="button" variant="ghost" size="icon" aria-label={`Remove ${r.name || "option"}`} onClick={() => setRows((rs) => rs.filter((x) => x.key !== r.key))}>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      aria-label={`Remove ${r.name || "option"}`}
+                      onClick={() => setRows((rs) => rs.filter((x) => x.key !== r.key))}
+                    >
                       <Trash2 />
                     </Button>
                   </div>
                 ))}
-                {[...stored].filter((k) => !basicNames.has(k)).map((k) => (
-                  <div key={k} className="flex items-center gap-2 text-xs">
-                    <span className="font-mono">{k}</span>
-                    <span className="text-muted-foreground">{secrets[k] === "" ? "will be removed" : "stored encrypted"}</span>
-                    {secrets[k] !== "" && (
-                      <Button type="button" variant="link" size="sm" className="h-auto p-0 text-xs" onClick={() => setSecrets((s) => ({ ...s, [k]: "" }))}>
-                        Remove
-                      </Button>
-                    )}
-                  </div>
-                ))}
-                <Button type="button" variant="outline" size="sm" className="justify-self-start" onClick={() => setRows((rs) => [...rs, { key: Date.now(), name: "", value: "" }])}>
+                {[...stored]
+                  .filter((k) => !basicNames.has(k))
+                  .map((k) => (
+                    <div key={k} className="flex items-center gap-2 text-xs">
+                      <span className="font-mono">{k}</span>
+                      <span className="text-muted-foreground">{secrets[k] === "" ? "will be removed" : "stored encrypted"}</span>
+                      {secrets[k] !== "" && (
+                        <Button
+                          type="button"
+                          variant="link"
+                          size="sm"
+                          className="h-auto p-0 text-xs"
+                          onClick={() => setSecrets((s) => ({ ...s, [k]: "" }))}
+                        >
+                          Remove
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="justify-self-start"
+                  onClick={() => setRows((rs) => [...rs, { key: Date.now(), name: "", value: "" }])}
+                >
                   <Plus /> Add option
                 </Button>
               </div>
             </details>
           )}
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-            <Button type="submit" disabled={save.isPending}>{account ? "Save" : "Create"}</Button>
+            <Button type="button" variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={save.isPending}>
+              {account ? "Save" : "Create"}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>
@@ -299,7 +362,12 @@ function OptionField(props: {
   // A fixed list (provider, ACLs, yes/no) is a select; otherwise examples are suggestions.
   const field =
     o.exclusive || o.name === "provider" || o.type === "bool" ? (
-      <NativeSelect id={id} value={props.value} onChange={(e) => props.onChange(e.target.value)} required={o.required || o.name === "provider"}>
+      <NativeSelect
+        id={id}
+        value={props.value}
+        onChange={(e) => props.onChange(e.target.value)}
+        required={o.required || o.name === "provider"}
+      >
         <option value="">{o.default ? `Default (${o.default})` : "Choose…"}</option>
         {examples.map((e) => (
           <option key={e.value} value={e.value}>
@@ -322,7 +390,9 @@ function OptionField(props: {
         {examples.length > 0 && (
           <datalist id={`${id}-ex`}>
             {examples.map((e) => (
-              <option key={e.value} value={e.value}>{firstLine(e.help)}</option>
+              <option key={e.value} value={e.value}>
+                {firstLine(e.help)}
+              </option>
             ))}
           </datalist>
         )}

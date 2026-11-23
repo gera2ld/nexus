@@ -71,9 +71,7 @@ function problemMessage(p: Problem | undefined, status: number): string {
 }
 
 /** Returns the data of an openapi-fetch result, or throws its error. */
-export async function unwrap<T>(
-  call: Promise<{ data?: T; error?: unknown; response: Response }>,
-): Promise<T> {
+export async function unwrap<T>(call: Promise<{ data?: T; error?: unknown; response: Response }>): Promise<T> {
   const { data, error, response } = await call;
   if (!response.ok) throw new ApiError(problemMessage(error as Problem, response.status), response.status);
   return data as T;

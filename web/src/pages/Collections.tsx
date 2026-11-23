@@ -40,7 +40,11 @@ const text = {
 const calls = {
   create: (k: Kind, v: Values) =>
     k === "calendars"
-      ? unwrap(api.POST("/calendars", { body: { name: v.name, description: v.description, color: v.color || undefined, components: v.components } }))
+      ? unwrap(
+          api.POST("/calendars", {
+            body: { name: v.name, description: v.description, color: v.color || undefined, components: v.components },
+          }),
+        )
       : unwrap(api.POST("/addressbooks", { body: { name: v.name, description: v.description } })),
   update: (k: Kind, slug: string, v: Values) => {
     const params = { path: { slug } };
@@ -101,8 +105,12 @@ export function Collections({ kind }: { kind: Kind }) {
                   </div>
                 </div>
                 <div className="flex gap-1">
-                  <Button variant="ghost" size="sm" onClick={() => setEditing(c)}>Edit</Button>
-                  <Button variant="ghost" size="sm" className="text-destructive" onClick={() => setDeleting(c)}>Delete</Button>
+                  <Button variant="ghost" size="sm" onClick={() => setEditing(c)}>
+                    Edit
+                  </Button>
+                  <Button variant="ghost" size="sm" className="text-destructive" onClick={() => setDeleting(c)}>
+                    Delete
+                  </Button>
                 </div>
               </CardContent>
             </Card>
@@ -131,7 +139,12 @@ export function Collections({ kind }: { kind: Kind }) {
           submit="Save"
           busy={update.isPending}
           editing
-          initial={{ name: editing.name, description: editing.description, color: editing.color ?? "", components: (editing.components ?? []) as Component[] }}
+          initial={{
+            name: editing.name,
+            description: editing.description,
+            color: editing.color ?? "",
+            components: (editing.components ?? []) as Component[],
+          }}
           onSubmit={(v) => update.mutate({ slug: editing.slug, v }, { onSuccess: () => setEditing(null) })}
         />
       )}
@@ -230,8 +243,12 @@ function CollectionForm(props: {
             </fieldset>
           )}
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => props.onOpenChange(false)}>Cancel</Button>
-            <Button type="submit" disabled={props.busy || (isCal && components.length === 0)}>{props.submit}</Button>
+            <Button type="button" variant="outline" onClick={() => props.onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={props.busy || (isCal && components.length === 0)}>
+              {props.submit}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

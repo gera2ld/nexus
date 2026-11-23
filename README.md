@@ -69,6 +69,10 @@ works. `npm run dev` in `web/` serves the app with live reload against a
 server on :8090. `scripts/probe.sh` checks a running server end to end
 with curl.
 
+Before committing, `npm run check` in `web/` runs the type check, oxlint
+and oxfmt (`npm run fmt` formats). `git config core.hooksPath .githooks`
+makes it a pre-commit hook for commits that touch `web/`.
+
 - [Product design](docs/PRODUCT.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Web app design](docs/WEB.md)

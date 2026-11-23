@@ -16,7 +16,9 @@ export function Overview() {
         <Card>
           <CardHeader>
             <CardTitle>Calendars and contacts</CardTitle>
-            <CardDescription>For Thunderbird, DAVx⁵, Apple Calendar and the like. They find everything from the server address.</CardDescription>
+            <CardDescription>
+              For Thunderbird, DAVx⁵, Apple Calendar and the like. They find everything from the server address.
+            </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-3 text-sm">
             <Row label="Server">
@@ -45,8 +47,8 @@ export function Overview() {
                     <li key={m.name}>
                       <Badge variant="secondary" asChild>
                         <Link to={`/files/${id}/${encodeURIComponent(m.name)}/`}>
-                        {m.name}
-                        {m.readOnly && <span className="font-normal text-muted-foreground"> · read-only</span>}
+                          {m.name}
+                          {m.readOnly && <span className="font-normal text-muted-foreground"> · read-only</span>}
                         </Link>
                       </Badge>
                     </li>

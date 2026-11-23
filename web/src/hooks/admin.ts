@@ -1,8 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { api, unwrap } from "@/api/client";
 
-export const useAccounts = () =>
-  useQuery({ queryKey: ["storage-accounts"], queryFn: () => unwrap(api.GET("/admin/storage-accounts")) });
+export const useAccounts = () => useQuery({ queryKey: ["storage-accounts"], queryFn: () => unwrap(api.GET("/admin/storage-accounts")) });
 
 export const useMounts = () => useQuery({ queryKey: ["mounts"], queryFn: () => unwrap(api.GET("/admin/mounts")) });
 

@@ -15,7 +15,7 @@ import {
   Upload,
   X,
 } from "lucide-react";
-import { useEffect, useRef, useState, type DragEvent, type FormEvent } from "react";
+import { useRef, useState, type DragEvent, type FormEvent } from "react";
 import { Link, useParams } from "react-router";
 import { toast } from "sonner";
 import { badName, list, mkcol, mountOf, parentOf, rawPath, remove, setUser, transfer, upload, type Entry } from "@/api/dav";
@@ -59,15 +59,16 @@ export function Files() {
       <aside className="hidden min-h-0 overflow-y-auto md:block">
         <Tree current={folder ? p : parentOf(p)} />
       </aside>
-      <section className="flex min-h-0 min-w-0 flex-col overflow-y-auto">{folder ? <FolderView key={p} path={p} /> : <FileView key={p} path={p} />}</section>
+      <section className="flex min-h-0 min-w-0 flex-col overflow-y-auto">
+        {folder ? <FolderView key={p} path={p} /> : <FileView key={p} path={p} />}
+      </section>
     </div>
   );
 }
 
 // ---- the tree ----
 
-export const useListing = (p: string, enabled = true) =>
-  useQuery({ queryKey: ["dav", p], queryFn: () => list(p), enabled, retry: false });
+export const useListing = (p: string, enabled = true) => useQuery({ queryKey: ["dav", p], queryFn: () => list(p), enabled, retry: false });
 
 function Tree({ current }: { current: string }) {
   const top = useListing("/");
@@ -78,7 +79,9 @@ function Tree({ current }: { current: string }) {
         Files
       </Link>
       <ul className="mt-1">
-        {top.data?.map((m) => <TreeNode key={m.path} entry={m} current={current} depth={0} />)}
+        {top.data?.map((m) => (
+          <TreeNode key={m.path} entry={m} current={current} depth={0} />
+        ))}
       </ul>
     </nav>
   );
@@ -87,16 +90,23 @@ function Tree({ current }: { current: string }) {
 function TreeNode({ entry, current, depth }: { entry: Entry; current: string; depth: number }) {
   const onPath = current.startsWith(entry.path);
   const [open, setOpen] = useState(onPath);
-  useEffect(() => {
+  // Opens when the current folder moves inside it (set during render, as
+  // React recommends for state that follows a prop).
+  const [wasOnPath, setWasOnPath] = useState(onPath);
+  if (onPath !== wasOnPath) {
+    setWasOnPath(onPath);
     if (onPath) setOpen(true);
-  }, [onPath]);
+  }
   const q = useListing(entry.path, open);
   const dirs = q.data?.filter((e) => e.dir) ?? [];
   const link = useFilesLink();
   const Icon = depth === 0 ? HardDrive : Folder;
   return (
     <li>
-      <div className={cn("flex items-center rounded-md hover:bg-accent", current === entry.path && "bg-accent font-medium")} style={{ paddingLeft: depth * 12 }}>
+      <div
+        className={cn("flex items-center rounded-md hover:bg-accent", current === entry.path && "bg-accent font-medium")}
+        style={{ paddingLeft: depth * 12 }}
+      >
         <button
           type="button"
           className="grid size-6 shrink-0 place-items-center text-muted-foreground"
@@ -113,7 +123,9 @@ function TreeNode({ entry, current, depth }: { entry: Entry; current: string; de
       </div>
       {open && dirs.length > 0 && (
         <ul>
-          {dirs.map((d) => <TreeNode key={d.path} entry={d} current={current} depth={depth + 1} />)}
+          {dirs.map((d) => (
+            <TreeNode key={d.path} entry={d} current={current} depth={depth + 1} />
+          ))}
         </ul>
       )}
     </li>
@@ -198,9 +210,9 @@ export function FolderView({ path }: { path: string }) {
   };
 
   /** Runs one step per entry, then reports failures together. */
-  const runAll = async (entries: Entry[], step: (e: Entry) => Promise<void>, done: string) => {
+  const runAll = async (targets: Entry[], step: (e: Entry) => Promise<void>, done: string) => {
     const errors: string[] = [];
-    for (const e of entries) await step(e).catch((err: Error) => errors.push(err.message));
+    for (const e of targets) await step(e).catch((err: Error) => errors.push(err.message));
     setSelected(new Set());
     refresh();
     if (errors.length) toast.error(errors.join("\n"));
@@ -273,10 +285,16 @@ export function FolderView({ path }: { path: string }) {
       {q.isPending ? (
         <Loading />
       ) : q.error ? (
-        <p role="alert" className="text-sm text-destructive">{q.error.message}</p>
+        <p role="alert" className="text-sm text-destructive">
+          {q.error.message}
+        </p>
       ) : entries.length === 0 ? (
         <div className="rounded-lg border border-dashed p-10 text-center text-sm text-muted-foreground">
-          {top ? "No mounts yet. An admin adds them." : readOnly ? "This folder is empty." : "This folder is empty. Drop files here or use Upload."}
+          {top
+            ? "No mounts yet. An admin adds them."
+            : readOnly
+              ? "This folder is empty."
+              : "This folder is empty. Drop files here or use Upload."}
         </div>
       ) : (
         <div className="rounded-md border">
@@ -303,17 +321,29 @@ export function FolderView({ path }: { path: string }) {
                 <TableRow key={e.path} data-state={selected.has(e.path) ? "selected" : undefined}>
                   {!top && (
                     <TableCell>
-                      <Checkbox aria-label={`Select ${e.name}`} checked={selected.has(e.path)} onCheckedChange={(on) => toggle(e.path, on === true)} />
+                      <Checkbox
+                        aria-label={`Select ${e.name}`}
+                        checked={selected.has(e.path)}
+                        onCheckedChange={(on) => toggle(e.path, on === true)}
+                      />
                     </TableCell>
                   )}
                   <TableCell className="max-w-0">
                     <Link to={link(e.path)} className="flex min-w-0 items-center gap-2 hover:underline">
-                      {top ? <HardDrive className="size-4 shrink-0 text-muted-foreground" /> : e.dir ? <Folder className="size-4 shrink-0 text-muted-foreground" /> : <File className="size-4 shrink-0 text-muted-foreground" />}
+                      {top ? (
+                        <HardDrive className="size-4 shrink-0 text-muted-foreground" />
+                      ) : e.dir ? (
+                        <Folder className="size-4 shrink-0 text-muted-foreground" />
+                      ) : (
+                        <File className="size-4 shrink-0 text-muted-foreground" />
+                      )}
                       <span className="truncate">{e.name}</span>
                       {top && mountInfo(e.name)?.readOnly && <Badge variant="secondary">read-only</Badge>}
                     </Link>
                   </TableCell>
-                  <TableCell className="hidden text-right text-muted-foreground tabular-nums sm:table-cell">{e.dir ? "" : formatSize(e.size)}</TableCell>
+                  <TableCell className="hidden text-right text-muted-foreground tabular-nums sm:table-cell">
+                    {e.dir ? "" : formatSize(e.size)}
+                  </TableCell>
                   <TableCell className="hidden text-muted-foreground lg:table-cell">{e.dir ? "" : formatTime(e.modified)}</TableCell>
                   <TableCell>
                     {!top && (
@@ -367,17 +397,25 @@ export function FolderView({ path }: { path: string }) {
           from={path}
           onClose={() => setDialog(null)}
           onPick={(dest) => {
-            const { kind, entries } = dialog;
+            const { kind, entries: targets } = dialog;
             setDialog(null);
             const method = kind === "move" ? "MOVE" : "COPY";
-            void runAll(entries, (e) => transfer(method, e.path, dest + e.name + (e.dir ? "/" : "")), `${kind === "move" ? "Moved" : "Copied"} to ${dest}`);
+            void runAll(
+              targets,
+              (e) => transfer(method, e.path, dest + e.name + (e.dir ? "/" : "")),
+              `${kind === "move" ? "Moved" : "Copied"} to ${dest}`,
+            );
           }}
         />
       )}
       <Confirm
         open={dialog?.kind === "delete"}
         onOpenChange={(o) => !o && setDialog(null)}
-        title={dialog?.kind === "delete" && dialog.entries.length === 1 ? `Delete ${dialog.entries[0].name}?` : `Delete ${dialog?.kind === "delete" ? dialog.entries.length : 0} items?`}
+        title={
+          dialog?.kind === "delete" && dialog.entries.length === 1
+            ? `Delete ${dialog.entries[0].name}?`
+            : `Delete ${dialog?.kind === "delete" ? dialog.entries.length : 0} items?`
+        }
         description={
           dialog?.kind === "delete" && dialog.entries.some((e) => e.dir)
             ? "Folders are deleted with everything in them. This can't be undone."
@@ -389,7 +427,11 @@ export function FolderView({ path }: { path: string }) {
       <Confirm
         open={dialog?.kind === "replace"}
         onOpenChange={(o) => !o && setDialog(null)}
-        title={dialog?.kind === "replace" && dialog.names.length === 1 ? `Replace ${dialog.names[0]}?` : `Replace ${dialog?.kind === "replace" ? dialog.names.length : 0} files?`}
+        title={
+          dialog?.kind === "replace" && dialog.names.length === 1
+            ? `Replace ${dialog.names[0]}?`
+            : `Replace ${dialog?.kind === "replace" ? dialog.names.length : 0} files?`
+        }
         description={
           dialog?.kind === "replace" ? (
             <>
@@ -429,9 +471,11 @@ function Uploads({ items, onClear }: { items: Upload[]; onClear: () => void }) {
               <p className="text-xs break-words text-destructive">{u.error}</p>
             ) : (
               !u.done && (
-                <div className="h-1 overflow-hidden rounded bg-muted" role="progressbar" aria-label={`Uploading ${u.name}`} aria-valuenow={Math.round(u.progress * 100)}>
-                  <div className="h-full bg-primary transition-[width]" style={{ width: `${u.progress * 100}%` }} />
-                </div>
+                <progress
+                  value={u.progress}
+                  aria-label={`Uploading ${u.name}`}
+                  className="block h-1 w-full appearance-none overflow-hidden rounded bg-muted [&::-moz-progress-bar]:bg-primary [&::-webkit-progress-bar]:bg-muted [&::-webkit-progress-value]:bg-primary"
+                />
               )
             )}
           </li>
@@ -441,7 +485,14 @@ function Uploads({ items, onClear }: { items: Upload[]; onClear: () => void }) {
   );
 }
 
-function RowMenu(props: { entry: Entry; readOnly: boolean; onRename: () => void; onMove: () => void; onCopy: () => void; onDelete: () => void }) {
+function RowMenu(props: {
+  entry: Entry;
+  readOnly: boolean;
+  onRename: () => void;
+  onMove: () => void;
+  onCopy: () => void;
+  onDelete: () => void;
+}) {
   const { entry: e, readOnly } = props;
   // Dialogs open once the menu has closed: while it closes, the menu still
   // holds focus and would pull it out of the dialog's name field.
@@ -557,8 +608,12 @@ function NameDialog(props: {
             {error && <p className="text-sm text-destructive">{error}</p>}
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={props.onClose}>Cancel</Button>
-            <Button type="submit" disabled={busy}>{props.action}</Button>
+            <Button type="button" variant="outline" onClick={props.onClose}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={busy}>
+              {props.action}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>
@@ -567,7 +622,13 @@ function NameDialog(props: {
 }
 
 /** Picks the folder to move or copy into; it can't be the top level or a read-only mount. */
-function DestinationDialog(props: { kind: "move" | "copy"; entries: Entry[]; from: string; onClose: () => void; onPick: (dest: string) => void }) {
+function DestinationDialog(props: {
+  kind: "move" | "copy";
+  entries: Entry[];
+  from: string;
+  onClose: () => void;
+  onPick: (dest: string) => void;
+}) {
   const [at, setAt] = useState(props.from);
   const q = useListing(at);
   const me = useMe();
@@ -581,7 +642,9 @@ function DestinationDialog(props: { kind: "move" | "copy"; entries: Entry[]; fro
     <Dialog open onOpenChange={(o) => !o && props.onClose()}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle className="break-all">{verb} {what}</DialogTitle>
+          <DialogTitle className="break-all">
+            {verb} {what}
+          </DialogTitle>
           <DialogDescription>Choose the folder to {props.kind} into.</DialogDescription>
         </DialogHeader>
         <div className="flex items-center gap-2">
@@ -597,21 +660,33 @@ function DestinationDialog(props: { kind: "move" | "copy"; entries: Entry[]; fro
             <p className="p-4 text-sm text-destructive">{q.error.message}</p>
           ) : (
             <ul className="divide-y text-sm">
-              {q.data.filter((e) => e.dir).map((e) => (
-                <li key={e.path}>
-                  <button type="button" className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-accent" onClick={() => setAt(e.path)}>
-                    {at === "/" ? <HardDrive className="size-4 shrink-0 text-muted-foreground" /> : <Folder className="size-4 shrink-0 text-muted-foreground" />}
-                    <span className="truncate">{e.name}</span>
-                  </button>
-                </li>
-              ))}
+              {q.data
+                .filter((e) => e.dir)
+                .map((e) => (
+                  <li key={e.path}>
+                    <button
+                      type="button"
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-accent"
+                      onClick={() => setAt(e.path)}
+                    >
+                      {at === "/" ? (
+                        <HardDrive className="size-4 shrink-0 text-muted-foreground" />
+                      ) : (
+                        <Folder className="size-4 shrink-0 text-muted-foreground" />
+                      )}
+                      <span className="truncate">{e.name}</span>
+                    </button>
+                  </li>
+                ))}
               {q.data.every((e) => !e.dir) && <li className="p-4 text-muted-foreground">No folders here.</li>}
             </ul>
           )}
         </div>
         {readOnly && at !== "/" && <p className="text-sm text-muted-foreground">This mount is read-only.</p>}
         <DialogFooter>
-          <Button variant="outline" onClick={props.onClose}>Cancel</Button>
+          <Button variant="outline" onClick={props.onClose}>
+            Cancel
+          </Button>
           <Button disabled={readOnly || inside || same} onClick={() => props.onPick(at)}>
             {verb} here
           </Button>

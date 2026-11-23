@@ -4,8 +4,7 @@ import { api, unwrap } from "@/api/client";
 
 export const useMe = () => useQuery({ queryKey: ["me"], queryFn: () => unwrap(api.GET("/me")) });
 
-export const usePasswords = () =>
-  useQuery({ queryKey: ["app-passwords"], queryFn: () => unwrap(api.GET("/app-passwords")) });
+export const usePasswords = () => useQuery({ queryKey: ["app-passwords"], queryFn: () => unwrap(api.GET("/app-passwords")) });
 
 export type Kind = "calendars" | "addressbooks";
 
