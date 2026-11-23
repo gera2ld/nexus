@@ -77,7 +77,7 @@ Product scope: [PRODUCT.md](PRODUCT.md) §3.5. Server architecture:
 
 ## 4. User dashboard
 
-- **Overview:** server address for calendar and contacts apps, the files
+- **Overview** (`/`, opened from the Nexus name in the header): server address for calendar and contacts apps, the files
   address, the user's mounts.
 - **App Passwords:** create; edit name, scopes and paths in place; revoke.
   The secret is shown once, at creation. Path rules are as now

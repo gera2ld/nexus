@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { CalendarDays, Contact, ExternalLink, FolderOpen, HardDrive, House, KeyRound, Users } from "lucide-react";
+import { CalendarDays, Contact, ExternalLink, FolderOpen, HardDrive, KeyRound, Users } from "lucide-react";
 import { createBrowserRouter, RouterProvider } from "react-router";
 import { ApiError, realm } from "@/api/client";
 import { Layout, Loading, NotFound, type NavItem } from "@/components/Layout";
@@ -27,7 +27,6 @@ const queryClient = new QueryClient({
 });
 
 const accountNav: NavItem[] = [
-  { to: "/", label: "Overview", icon: House, end: true },
   { to: "/files", label: "Files", icon: FolderOpen },
   { to: "/account/app-passwords", label: "App Passwords", icon: KeyRound },
   { to: "/account/calendars", label: "Calendars", icon: CalendarDays },
@@ -54,7 +53,7 @@ const router = createBrowserRouter(
         {
           // The overview is the home page; the rest live under /account.
           path: "/",
-          element: <Layout title="Nexus" nav={accountNav} />,
+          element: <Layout title="Nexus" home="/" nav={accountNav} />,
           children: [
             { index: true, element: <Overview /> },
             { path: "account/app-passwords", element: <AppPasswords /> },
@@ -70,7 +69,7 @@ const router = createBrowserRouter(
     : [
         {
           path: "/admin",
-          element: <Layout title="Nexus admin" nav={adminNav} extra={pocketbaseLink} />,
+          element: <Layout title="Nexus admin" home="/admin" nav={adminNav} extra={pocketbaseLink} />,
           children: [
             // Storage is the admin home page, as the overview is the user's.
             { index: true, element: <Storage /> },

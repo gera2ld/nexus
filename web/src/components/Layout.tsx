@@ -15,7 +15,18 @@ import { cn } from "@/lib/utils";
 
 export type NavItem = { to: string; label: string; icon: LucideIcon; end?: boolean };
 
-export function Layout({ title, nav, extra }: { title: string; nav: NavItem[]; extra?: React.ReactNode }) {
+export function Layout({
+  title,
+  home,
+  nav,
+  extra,
+}: {
+  title: string;
+  /** Where the title links to. */
+  home: string;
+  nav: NavItem[];
+  extra?: React.ReactNode;
+}) {
   const { signOut, account } = useAuth();
   // The Files page and its editor use the width.
   const width = useLocation().pathname.startsWith("/files") ? "max-w-7xl" : "max-w-5xl";
@@ -23,7 +34,9 @@ export function Layout({ title, nav, extra }: { title: string; nav: NavItem[]; e
     <div className="min-h-svh">
       <header className="border-b">
         <div className={cn("mx-auto flex flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3", width)}>
-          <span className="font-semibold">{title}</span>
+          <Link to={home} className="font-semibold">
+            {title}
+          </Link>
           <nav className="order-last flex w-full flex-wrap gap-1 md:order-none md:w-auto">
             {nav.map(({ to, label, icon: Icon, end }) => (
               <NavLink
