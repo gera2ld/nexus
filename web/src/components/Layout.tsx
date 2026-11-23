@@ -35,7 +35,8 @@ export function Layout({
     <div className={fill ? "flex h-svh flex-col" : "min-h-svh"}>
       <header className="shrink-0 border-b">
         <div className={cn("mx-auto flex flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3", width)}>
-          <Link to={home} className="font-semibold">
+          <Link to={home} className="flex items-center gap-2 font-semibold">
+            <img src={`${import.meta.env.BASE_URL}favicon.svg`} alt="" className="size-6" />
             {title}
           </Link>
           <nav className="order-last flex w-full flex-wrap gap-1 md:order-none md:w-auto">
