@@ -28,9 +28,10 @@
   section { background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
             padding: 20px; margin-top: 20px; }
   label { display: block; font-weight: 600; margin: 12px 0 4px; }
-  input[type=email], input[type=password], input[type=text] {
+  input[type=email], input[type=password], input[type=text], textarea {
     width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px;
     background: var(--bg); color: var(--text); font: inherit; }
+  textarea { resize: vertical; }
   .checks label { display: inline-flex; gap: 6px; align-items: center; font-weight: 400; margin: 4px 16px 0 0; }
   button { font: inherit; padding: 8px 14px; border-radius: 6px; border: 1px solid var(--line);
            background: var(--panel); color: var(--text); cursor: pointer; }
@@ -116,6 +117,9 @@
           <label><input type="checkbox" name="scope" value="card" checked> Contacts</label>
           <label><input type="checkbox" name="scope" value="files"> Files</label>
         </div>
+        <label for="paths">Limit to paths (optional)</label>
+        <textarea id="paths" rows="3" placeholder="/dav/calendars/personal/&#10;/files/docs/"></textarea>
+        <p class="muted">One folder per line, starting with <code>/dav/</code> or <code>/files/</code> and ending with <code>/</code>, e.g. <code>/dav/calendars/personal/</code> or <code>/files/docs/</code>. Addresses copied from above, with your id, work too. Calendars and address books can be limited one at a time, not to single events or contacts. Leave empty for everything the scopes above allow. Outside these folders the password can only see the folders that lead to them.</p>
         <button class="primary" type="submit">Create App Password</button>
         <div class="error" id="create-error" role="alert"></div>
       </form>
@@ -130,7 +134,7 @@
       <h2>Your App Passwords</h2>
       <p id="empty" class="muted hidden">None yet.</p>
       <table id="table" class="hidden">
-        <thead><tr><th>Name</th><th>Access</th><th>Created</th><th>Last used</th><th></th></tr></thead>
+        <thead><tr><th>Name</th><th>Access</th><th>Paths</th><th>Created</th><th>Last used</th><th></th></tr></thead>
         <tbody id="rows"></tbody>
       </table>
       <div class="error" id="list-error" role="alert"></div>
@@ -215,6 +219,18 @@
           t.textContent = SCOPE_NAMES[s] || s;
           access.appendChild(t);
         });
+        var paths = document.createElement("td");
+        var pw = p.paths || [];
+        if (!pw.length) {
+          paths.textContent = "All";
+          paths.className = "muted";
+        }
+        pw.forEach(function (p) {
+          var c = document.createElement("code");
+          c.textContent = p;
+          paths.appendChild(c);
+          paths.appendChild(document.createElement("br"));
+        });
         var created = document.createElement("td");
         created.textContent = fmt(p.created);
         var used = document.createElement("td");
@@ -237,7 +253,7 @@
           });
           actions.appendChild(b);
         }
-        [name, access, created, used, actions].forEach(function (td) { tr.appendChild(td); });
+        [name, access, paths, created, used, actions].forEach(function (td) { tr.appendChild(td); });
         rows.appendChild(tr);
       });
     }).catch(function (err) { $("list-error").textContent = err.message; });
@@ -260,11 +276,14 @@
     $("create-error").textContent = "";
     var scopes = Array.prototype.slice.call(document.querySelectorAll("input[name=scope]:checked"))
       .map(function (c) { return c.value; });
-    api("POST", "/api/nexus/app-passwords", { label: $("label").value, scopes: scopes })
+    var paths = $("paths").value.split("\n").map(function (p) { return p.trim(); })
+      .filter(function (p) { return p !== ""; });
+    api("POST", "/api/nexus/app-passwords", { label: $("label").value, scopes: scopes, paths: paths })
       .then(function (p) {
         $("secret").textContent = p.secret;
         $("new-secret").classList.remove("hidden");
         $("label").value = "";
+        $("paths").value = "";
         return refresh();
       })
       .catch(function (err) { $("create-error").textContent = err.message; });

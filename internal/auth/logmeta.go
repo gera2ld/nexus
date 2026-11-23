@@ -29,4 +29,5 @@ const (
 	SignInFailed  = "failed"  // unknown email, wrong or revoked App Password
 	SignInBlocked = "blocked" // too many failures from this address
 	SignInScope   = "scope"   // valid App Password without the needed scope
+	SignInPath    = "path"    // valid App Password outside its allowed paths
 )

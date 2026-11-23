@@ -9,6 +9,7 @@ import (
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
 	"github.com/emersion/go-vcard"
 
+	"nexus/internal/auth"
 	"nexus/internal/dav/carddav"
 )
 
@@ -52,9 +53,14 @@ func (b *CardDAV) ListAddressBooks(ctx context.Context) ([]carddav.AddressBook, 
 	if err != nil {
 		return nil, err
 	}
+	allowed := auth.AllowedPaths(ctx)
 	out := make([]carddav.AddressBook, 0, len(recs))
 	for _, r := range recs {
-		out = append(out, b.toBook(uid, r))
+		book := b.toBook(uid, r)
+		if !auth.PathAllowed(book.Path, uid, allowed) {
+			continue
+		}
+		out = append(out, book)
 	}
 	return out, nil
 }

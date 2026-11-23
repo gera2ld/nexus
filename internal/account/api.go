@@ -32,6 +32,7 @@ type AppPasswordView struct {
 	ID         string   `json:"id"`
 	Label      string   `json:"label"`
 	Scopes     []string `json:"scopes"`
+	Paths      []string `json:"paths"`
 	Created    string   `json:"created"`
 	LastUsedAt string   `json:"lastUsedAt"`
 	RevokedAt  string   `json:"revokedAt"`
@@ -44,6 +45,7 @@ func view(r *core.Record) AppPasswordView {
 		ID:         r.Id,
 		Label:      r.GetString("label"),
 		Scopes:     r.GetStringSlice("scopes"),
+		Paths:      r.GetStringSlice("paths"),
 		Created:    r.GetString("created"),
 		LastUsedAt: r.GetString("last_used_at"),
 		RevokedAt:  r.GetString("revoked_at"),
@@ -104,6 +106,7 @@ func list(e *core.RequestEvent) error {
 type createReq struct {
 	Label  string   `json:"label"`
 	Scopes []string `json:"scopes"`
+	Paths  []string `json:"paths"`
 }
 
 func create(e *core.RequestEvent) error {
@@ -118,6 +121,10 @@ func create(e *core.RequestEvent) error {
 	scopes, ok := cleanScopes(req.Scopes)
 	if !ok {
 		return e.BadRequestError("Choose at least one of: cal, card, files.", nil)
+	}
+	paths, err := auth.NormalizePaths(req.Paths, e.Auth.Id)
+	if err != nil {
+		return e.BadRequestError(err.Error(), nil)
 	}
 	active, err := e.App.CountRecords(schema.AppPasswords,
 		dbx.HashExp{"user": e.Auth.Id, "revoked_at": ""})
@@ -137,6 +144,7 @@ func create(e *core.RequestEvent) error {
 	rec.Set("user", e.Auth.Id)
 	rec.Set("label", label)
 	rec.Set("scopes", scopes)
+	rec.Set("paths", paths)
 	rec.Set("secret_hash", auth.HashSecret(secret))
 	if err := e.App.Save(rec); err != nil {
 		return e.InternalServerError("", err)

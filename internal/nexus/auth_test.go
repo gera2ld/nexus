@@ -7,6 +7,8 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -124,6 +126,22 @@ func (s *server) newPassword(tok, label string, scopes ...string) account.AppPas
 	return v
 }
 
+// newPasswordWithPaths creates an App Password with a path restriction.
+func (s *server) newPasswordWithPaths(tok, label string, paths []string, scopes ...string) account.AppPasswordView {
+	s.t.Helper()
+	r := s.do("POST", "/api/nexus/app-passwords", map[string]any{
+		"label": label, "scopes": scopes, "paths": paths,
+	}, bearer(tok))
+	if r.code != http.StatusCreated {
+		s.t.Fatalf("create path-restricted app password: %d %s", r.code, r.body)
+	}
+	var v account.AppPasswordView
+	if err := json.Unmarshal([]byte(r.body), &v); err != nil {
+		s.t.Fatal(err)
+	}
+	return v
+}
+
 const propfind = `<?xml version="1.0"?><d:propfind xmlns:d="DAV:"><d:prop><d:resourcetype/></d:prop></d:propfind>`
 
 func (s *server) propfind(path string, setup func(*http.Request)) int {
@@ -204,6 +222,188 @@ func TestAppPasswordScopes(t *testing.T) {
 		if got := s.propfind(path, creds); got != want {
 			t.Errorf("card-only on %s: got %d, want %d", path, got, want)
 		}
+	}
+}
+
+func TestAppPasswordPaths(t *testing.T) {
+	s := newServer(t)
+	u, tok := s.user("ada@example.com")
+
+	for _, paths := range [][]string{{"/api/"}, {"/dav/x/../y/"}} {
+		r := s.do("POST", "/api/nexus/app-passwords", map[string]any{
+			"label": "bad", "scopes": []string{"cal"}, "paths": paths,
+		}, bearer(tok))
+		if r.code != http.StatusBadRequest {
+			t.Errorf("paths %v: got %d, want 400", paths, r.code)
+		}
+	}
+
+	pw := s.newPasswordWithPaths(tok, "one calendar", []string{"/dav/calendars/personal"}, "cal", "card", "files")
+	if got := strings.Join(pw.Paths, ","); got != "/dav/calendars/personal/" {
+		t.Errorf("stored paths = %q, want trailing-slash normalisation", got)
+	}
+	home := "/dav/" + u.Id + "/"
+	cal := home + "calendars/personal/"
+	creds := basic("ada@example.com", pw.Secret)
+
+	for path, want := range map[string]int{
+		home:                             http.StatusMultiStatus, // discovery
+		home + "calendars/":              http.StatusMultiStatus, // home listing
+		cal:                              http.StatusMultiStatus,
+		home + "calendars/work/":         http.StatusForbidden,
+		home + "contacts/contacts/":      http.StatusForbidden,
+		"/files/" + u.Id + "/docs/a.txt": http.StatusForbidden,
+	} {
+		if got := s.propfind(path, creds); got != want {
+			t.Errorf("propfind %s: got %d, want %d", path, got, want)
+		}
+	}
+
+	write := func(path string) int {
+		const ics = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//test//EN\r\nBEGIN:VEVENT\r\nUID:a\r\nDTSTAMP:20261122T100000Z\r\nDTSTART:20261201T100000Z\r\nSUMMARY:A\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n"
+		return s.do("PUT", path, ics, func(r *http.Request) {
+			creds(r)
+			r.Header.Set("Content-Type", "text/calendar")
+		}).code
+	}
+	if got := write(home + "calendars/work/a.ics"); got != http.StatusForbidden {
+		t.Errorf("PUT outside allowed path: got %d, want 403", got)
+	}
+	if n := count(t, s.app, schema.CalendarObjects); n != 0 {
+		t.Errorf("%d objects created outside allowed path, want 0", n)
+	}
+	if got := write(cal + "a.ics"); got != http.StatusCreated {
+		t.Errorf("PUT inside allowed path: got %d, want 201", got)
+	}
+	if n := count(t, s.app, schema.CalendarObjects); n != 1 {
+		t.Errorf("%d objects after allowed PUT, want 1", n)
+	}
+
+	work := core.NewRecord(mustCollection(t, s.app, schema.Calendars))
+	work.Set("owner", u.Id)
+	work.Set("slug", "work")
+	work.Set("name", "Work")
+	work.Set("components", []string{"VEVENT", "VTODO"})
+	if err := s.app.Save(work); err != nil {
+		t.Fatal(err)
+	}
+	list := func(secret string) string {
+		return s.do("PROPFIND", home+"calendars/", `<propfind xmlns="DAV:"><prop><displayname/></prop></propfind>`,
+			func(r *http.Request) {
+				r.SetBasicAuth("ada@example.com", secret)
+				r.Header.Set("Depth", "1")
+			}).body
+	}
+	body := list(pw.Secret)
+	if !strings.Contains(body, "/personal/") || strings.Contains(body, "/work/") {
+		t.Errorf("restricted calendar listing leaked or hid collections: %s", body)
+	}
+	all := s.newPassword(tok, "all calendars", "cal")
+	if body := list(all.Secret); !strings.Contains(body, "/work/") {
+		t.Errorf("unrestricted calendar listing lacks /work/: %s", body)
+	}
+}
+
+func TestAppPasswordPathsFiles(t *testing.T) {
+	f := newFilesEnv(t)
+	restricted := f.server.newPasswordWithPaths(f.userTok, "docs only", []string{"/files/docs/"}, "files")
+	creds := basic("ada@example.com", restricted.Secret)
+
+	list := f.do("PROPFIND", f.base+"/", `<propfind xmlns="DAV:"><prop><displayname/></prop></propfind>`,
+		func(r *http.Request) { creds(r); r.Header.Set("Depth", "1") })
+	if list.code != http.StatusMultiStatus || !strings.Contains(list.body, "/docs/") ||
+		strings.Contains(list.body, "/archive/") || strings.Contains(list.body, "/scratch/") {
+		t.Errorf("restricted mount listing: %d %s", list.code, list.body)
+	}
+	put := func(path, body string) int {
+		return f.do("PUT", path, body, creds).code
+	}
+	if got := put(f.base+"/archive/evil.txt", "x"); got != http.StatusForbidden {
+		t.Errorf("PUT outside allowed mount: got %d, want 403", got)
+	}
+	if _, err := os.Stat(filepath.Join(f.arch, "evil.txt")); !os.IsNotExist(err) {
+		t.Errorf("refused PUT created a file: %v", err)
+	}
+	if got := put(f.base+"/docs/ok.txt", "x"); got != http.StatusCreated {
+		t.Errorf("PUT inside allowed mount: got %d, want 201", got)
+	}
+	if _, err := os.Stat(filepath.Join(f.docs, "ok.txt")); err != nil {
+		t.Errorf("allowed PUT did not create the file: %v", err)
+	}
+
+	// A MOVE's Destination is a write too, even though the request path is
+	// an allowed one.
+	move := f.do("MOVE", f.base+"/docs/ok.txt", nil, func(r *http.Request) {
+		creds(r)
+		r.Header.Set("Destination", f.base+"/archive/stolen.txt")
+	})
+	if move.code != http.StatusForbidden {
+		t.Errorf("MOVE to a disallowed destination: got %d, want 403", move.code)
+	}
+	if _, err := os.Stat(filepath.Join(f.arch, "stolen.txt")); !os.IsNotExist(err) {
+		t.Errorf("refused MOVE created a file outside the allowed path: %v", err)
+	}
+}
+
+// TestAppPasswordPathsParentsOnlyDiscover: a parent folder of an allowed
+// path takes only discovery, and its listing shows only what leads to an
+// allowed path. Before, a password limited to docs/a/b/ could list, copy
+// out and delete the rest of docs/a/.
+func TestAppPasswordPathsParentsOnlyDiscover(t *testing.T) {
+	f := newFilesEnv(t)
+	os.MkdirAll(filepath.Join(f.docs, "a", "b"), 0o755)
+	os.WriteFile(filepath.Join(f.docs, "a", "secret.txt"), []byte("outside"), 0o644)
+	os.WriteFile(filepath.Join(f.docs, "a", "b", "in.txt"), []byte("inside"), 0o644)
+	// Paths as a user would paste them from the account page, with their id.
+	pw := f.server.newPasswordWithPaths(f.userTok, "b only",
+		[]string{"/files/" + f.uid + "/docs/a/b/", "/files/scratch/"}, "files")
+	creds := basic("ada@example.com", pw.Secret)
+	depth := func(d string) func(*http.Request) {
+		return func(r *http.Request) { creds(r); r.Header.Set("Depth", d) }
+	}
+
+	ls := f.do("PROPFIND", f.base+"/docs/a/", nil, depth("1"))
+	if ls.code != http.StatusMultiStatus || !strings.Contains(ls.body, "/docs/a/b/") || strings.Contains(ls.body, "secret.txt") {
+		t.Errorf("parent listing: %d, want b/ and not secret.txt:\n%s", ls.code, ls.body)
+	}
+	for _, d := range []string{"infinity", ""} {
+		if r := f.do("PROPFIND", f.base+"/docs/", nil, depth(d)); r.code != http.StatusForbidden {
+			t.Errorf("PROPFIND Depth %q on a parent: %d, want 403", d, r.code)
+		}
+	}
+	if r := f.do("PROPFIND", f.base+"/docs/a/b/", nil, depth("1")); r.code != http.StatusMultiStatus || !strings.Contains(r.body, "in.txt") {
+		t.Errorf("allowed folder (path stored with the user id): %d %s", r.code, r.body)
+	}
+
+	cp := f.do("COPY", f.base+"/docs/a/", nil, func(r *http.Request) { creds(r); r.Header.Set("Destination", f.base+"/scratch/loot/") })
+	if cp.code != http.StatusForbidden {
+		t.Errorf("COPY a parent into an allowed folder: %d, want 403", cp.code)
+	}
+	if _, err := os.Stat(filepath.Join(f.scratch, "loot")); !os.IsNotExist(err) {
+		t.Errorf("refused COPY copied files: %v", err)
+	}
+	if r := f.do("DELETE", f.base+"/docs/a/", nil, creds); r.code != http.StatusForbidden {
+		t.Errorf("DELETE a parent: %d, want 403", r.code)
+	}
+	if r := f.do("LOCK", f.base+"/docs/a/", lockBody, creds); r.code != http.StatusForbidden {
+		t.Errorf("LOCK a parent: %d, want 403", r.code)
+	}
+	if _, err := os.Stat(filepath.Join(f.docs, "a", "secret.txt")); err != nil {
+		t.Errorf("secret.txt is gone: %v", err)
+	}
+	// A Destination that is a parent of an allowed path is refused too:
+	// moving over docs/a would replace everything in it.
+	os.WriteFile(filepath.Join(f.scratch, "x.txt"), []byte("x"), 0o644)
+	mv := f.do("MOVE", f.base+"/scratch/x.txt", nil, func(r *http.Request) {
+		creds(r)
+		r.Header.Set("Destination", f.base+"/docs/a")
+		r.Header.Set("Overwrite", "T")
+	})
+	if mv.code != http.StatusForbidden {
+		t.Errorf("MOVE over a parent folder: %d, want 403", mv.code)
+	}
+	if r := f.do("DELETE", f.base+"/docs/a/b/in.txt", nil, creds); r.code != http.StatusNoContent {
+		t.Errorf("DELETE inside the allowed folder: %d, want 204", r.code)
 	}
 }
 

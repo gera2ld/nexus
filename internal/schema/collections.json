@@ -302,6 +302,17 @@
         ]
       },
       {
+        "help": "Optional slash-ended path prefixes, e.g. [\"/dav/calendars/personal/\", \"/files/docs/\"].",
+        "hidden": false,
+        "id": "json_ap_paths",
+        "maxSize": 8192,
+        "name": "paths",
+        "presentable": false,
+        "required": false,
+        "system": false,
+        "type": "json"
+      },
+      {
         "help": "",
         "hidden": false,
         "id": "date1644068338",

@@ -15,6 +15,7 @@ import (
 	"github.com/rclone/rclone/vfs"
 	"golang.org/x/net/webdav"
 
+	"nexus/internal/auth"
 	"nexus/internal/storage"
 )
 
@@ -71,13 +72,21 @@ func (u *userFS) OpenFile(ctx context.Context, name string, flag int, perm os.Fi
 		if flag&(os.O_WRONLY|os.O_RDWR|os.O_CREATE|os.O_TRUNC) != 0 {
 			return nil, os.ErrPermission
 		}
-		return u.root(), nil
+		return u.root(ctx), nil
 	}
 	h, err := mt.VFS.OpenFile(inner, flag, perm)
 	if err != nil {
 		return nil, err
 	}
-	return handle{Handle: h, ctx: ctx, name: rootName(mt, inner)}, nil
+	out := handle{Handle: h, ctx: ctx, name: rootName(mt, inner)}
+	// A parent of an App Password's allowed paths lists only the entries
+	// that lead to one.
+	allowed := auth.AllowedPaths(ctx)
+	dir := Prefix + "/" + u.uid + strings.TrimSuffix(name, "/") + "/"
+	if auth.PathAccess(dir, u.uid, allowed) == auth.Discover {
+		out.visible = func(child string) bool { return auth.PathAllowed(dir+child+"/", u.uid, allowed) }
+	}
+	return out, nil
 }
 
 func (u *userFS) RemoveAll(ctx context.Context, name string) error {
@@ -135,14 +144,31 @@ func rootName(mt *storage.Mount, inner string) string {
 	return ""
 }
 
-// root lists the user's mounts as directories.
-func (u *userFS) root() webdav.File {
-	return &rootDir{u: u}
+// root lists the user's mounts as directories, filtered by the App
+// Password's path restriction when it has one.
+func (u *userFS) root(ctx context.Context) webdav.File {
+	return &rootDir{u: u, allowed: auth.AllowedPaths(ctx)}
 }
 
 type rootDir struct {
-	u    *userFS
-	done bool
+	u       *userFS
+	allowed []string
+	done    bool
+}
+
+// mountAllowed reports whether a mount is inside (or contains) an allowed
+// path prefix. With no restriction every mount is listed.
+func mountAllowed(allowed []string, name string) bool {
+	if len(allowed) == 0 {
+		return true
+	}
+	prefix := "/files/" + name + "/"
+	for _, p := range allowed {
+		if strings.HasPrefix(p, prefix) || strings.HasPrefix(prefix, p) {
+			return true
+		}
+	}
+	return false
 }
 
 func (d *rootDir) Close() error                   { return nil }
@@ -164,6 +190,9 @@ func (d *rootDir) Readdir(count int) ([]os.FileInfo, error) {
 	}
 	out := make([]os.FileInfo, 0, len(recs))
 	for _, r := range recs {
+		if !mountAllowed(d.allowed, r.GetString("name")) {
+			continue
+		}
 		out = append(out, dirInfo{name: r.GetString("name"), mod: r.GetDateTime("updated").Time()})
 	}
 	return out, nil
@@ -185,8 +214,9 @@ func (d dirInfo) Sys() any           { return nil }
 // handle wraps an open VFS file so that Stat and Readdir return fileInfo.
 type handle struct {
 	vfs.Handle
-	ctx  context.Context
-	name string
+	ctx     context.Context
+	name    string
+	visible func(child string) bool // nil: list every entry
 }
 
 func (h handle) Stat() (os.FileInfo, error) {
@@ -199,10 +229,13 @@ func (h handle) Stat() (os.FileInfo, error) {
 
 func (h handle) Readdir(count int) ([]os.FileInfo, error) {
 	fis, err := h.Handle.Readdir(count)
-	for i := range fis {
-		fis[i] = fileInfo{FileInfo: fis[i]}
+	out := fis[:0]
+	for _, fi := range fis {
+		if h.visible == nil || h.visible(fi.Name()) {
+			out = append(out, fileInfo{FileInfo: fi})
+		}
 	}
-	return fis, err
+	return out, err
 }
 
 // DeadProps and Patch accept property writes without storing them, as

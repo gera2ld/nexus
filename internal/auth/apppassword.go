@@ -149,10 +149,17 @@ func (a *AppPassword) Wrap(next http.Handler) http.Handler {
 			http.Error(w, "this App Password is not allowed to access "+r.URL.Path, http.StatusForbidden)
 			return
 		}
+		paths, err := NormalizePaths(pw.GetStringSlice("paths"), user.Id)
+		if err != nil || !RequestAllowed(r, user.Id, paths) {
+			setMeta(ctx, "signin", SignInPath)
+			http.Error(w, "this App Password is not allowed to access "+r.URL.Path, http.StatusForbidden)
+			return
+		}
 
 		setMeta(ctx, "signin", SignInOK)
 		a.touch(pw)
-		next.ServeHTTP(w, r.WithContext(principal.With(r.Context(), user.Id)))
+		ctx = WithAllowedPaths(ctx, paths)
+		next.ServeHTTP(w, r.WithContext(principal.With(ctx, user.Id)))
 	})
 }
 

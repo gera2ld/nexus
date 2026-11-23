@@ -92,8 +92,9 @@ Nexus offers a minimal web interface for:
 - **Storage:** configure storage accounts (S3 credentials, local paths) and
   mount them into a user's file space.
 - **App Passwords:** generate and revoke one password per device or app. Each
-  can be limited to calendars, contacts and/or files. The account password
-  never works for DAV.
+  can be limited to calendars, contacts and/or files, and optionally to
+  specific folders (e.g. one calendar or one file mount). The account
+  password never works for DAV.
 - **Logs:** request, sync and error logs, to answer "why isn't my phone
   syncing?".
 

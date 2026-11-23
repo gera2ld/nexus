@@ -14,6 +14,7 @@ import (
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/types"
 	"github.com/emersion/go-ical"
 
+	"nexus/internal/auth"
 	"nexus/internal/dav/caldav"
 )
 
@@ -62,9 +63,14 @@ func (b *CalDAV) ListCalendars(ctx context.Context) ([]caldav.Calendar, error) {
 	if err != nil {
 		return nil, err
 	}
+	allowed := auth.AllowedPaths(ctx)
 	out := make([]caldav.Calendar, 0, len(recs))
 	for _, r := range recs {
-		out = append(out, b.toCalendar(uid, r))
+		cal := b.toCalendar(uid, r)
+		if !auth.PathAllowed(cal.Path, uid, allowed) {
+			continue
+		}
+		out = append(out, cal)
 	}
 	return out, nil
 }

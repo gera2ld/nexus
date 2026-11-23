@@ -17,6 +17,7 @@ import (
 
 	"golang.org/x/net/webdav"
 
+	"nexus/internal/auth"
 	"nexus/internal/principal"
 	"nexus/internal/storage"
 )
@@ -110,6 +111,14 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	dst, hasDst := "", false
 	if r.Method == "MOVE" || r.Method == "COPY" {
 		if dst, hasDst = destination(r, base); hasDst {
+			// The source path was checked by the auth middleware; a COPY or
+			// MOVE also writes its Destination, which must be inside an
+			// allowed path (a parent of one only allows discovery).
+			if auth.PathAccess(base+dst, uid, auth.AllowedPaths(ctx)) != auth.Full {
+				auth.MarkPathDenied(ctx)
+				http.Error(w, "this App Password is not allowed to access "+base+dst, http.StatusForbidden)
+				return
+			}
 			if status, msg := h.writable(ctx, fsys, "PUT", dst, false); status != 0 {
 				http.Error(w, msg, status)
 				return

@@ -196,6 +196,24 @@ created when a user is created.
   `calendars/…` needs `cal`, `contacts/…` needs `card`, `/files/…` needs
   `files`, and discovery (`/dav/`, `/dav/{uid}/`) accepts either `cal` or
   `card`. A wrong scope gets 403.
+- **Path restriction:** a password can optionally carry `paths`, a JSON list
+  of user-rooted prefixes with the service namespace, e.g.
+  `/dav/calendars/personal/` or `/files/docs/`. The API normalises every
+  entry to start and end with `/`, so siblings can't match by accident,
+  removes the user's own id (so addresses copied from the account page
+  work), and refuses anything outside `/dav/` or `/files/` (including
+  `..`). DAV entries stop at a calendar or address book, since discovery
+  on a collection would list objects the password may not read.
+- **What a restricted password may do:** anything inside a listed path.
+  On a parent of one (the DAV principal and homes, a mount root, folders
+  on the way down) only `OPTIONS` and `PROPFIND` with `Depth` 0 or 1, and
+  listings there show only entries that lead to an allowed path: the
+  backends filter calendars, address books, mounts and folders. Writes,
+  COPY, MOVE, LOCK, GET and Depth-infinity listings on a parent get 403, as
+  does a COPY or MOVE `Destination` that isn't inside an allowed path.
+  An empty list keeps the old, unrestricted behaviour. `paths` is stored
+  on the record, carried through the request context, and shown in the log
+  meta as `signin: path` when it denies a request.
 - **`last_used_at`** is written at most once a minute per password.
 - **Revoked passwords** fail on the next request. There is no credential
   cache: each request costs one indexed lookup by email and one by hash,
