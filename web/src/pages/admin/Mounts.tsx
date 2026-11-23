@@ -39,7 +39,7 @@ export function Mounts() {
       </PageHeader>
       {noAccounts ? (
         <p className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-          Mounts need a storage account. <Link to="/admin/storage" className="underline underline-offset-4">Add one first.</Link>
+          Mounts need a storage account. <Link to="/admin" className="underline underline-offset-4">Add one first.</Link>
         </p>
       ) : list.data.length === 0 ? (
         <p className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">No mounts yet. Users see no files until they have one.</p>

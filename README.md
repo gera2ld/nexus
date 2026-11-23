@@ -24,7 +24,7 @@ them.
    no public sign-up.
 3. For files, add storage and give the user a mount at
    `https://dav.example.com/admin`.
-4. The user signs in at `https://dav.example.com/account` and creates an
+4. The user signs in at `https://dav.example.com/` and creates an
    App Password for each device.
 
 ## Connect your apps
@@ -62,7 +62,7 @@ go run ./cmd/nexus superuser upsert admin@example.com <password>
 go run ./cmd/nexus serve                         # http://127.0.0.1:8090/_/
 ```
 
-Without the web app build, `/account` shows a placeholder; everything else
+Without the web app build, `/` shows a placeholder; everything else
 works. `npm run dev` in `web/` serves the app with live reload against a
 server on :8090. `scripts/probe.sh` checks a running server end to end
 with curl.

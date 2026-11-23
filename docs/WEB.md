@@ -26,12 +26,13 @@ Product scope: [PRODUCT.md](PRODUCT.md) §3.5. Server architecture:
 ## 2. URLs
 
 ```
-/account/                     user dashboard: overview (replaces the /account page)
+/                             user dashboard: overview
 /account/app-passwords        App Passwords
 /account/calendars            calendars
 /account/contacts             address books
 /account/shares               share links
-/admin/                       admin dashboard: storage accounts and mounts
+/admin                        admin dashboard: storage accounts
+/admin/mounts                 mounts
 /browser/                     302 → /browser/{uid}/ (the signed-in user)
 /browser/{uid}/               file browser: the user's mounts
 /browser/{uid}/{mount}/path/  a folder
@@ -47,13 +48,16 @@ Product scope: [PRODUCT.md](PRODUCT.md) §3.5. Server architecture:
 - The two serve different purposes and never redirect to each other:
   `/files/…` is always raw WebDAV, for clients and raw links; `/browser/…`
   is always the app.
-- The Go server answers every `/account*`, `/admin*` and `/browser*` path
-  with the app's `index.html`; React Router does the rest.
+- The Go server answers `/` (GET only), `/account/*`, `/admin`, `/admin/*`
+  and `/browser*` with the app's `index.html`; React Router does the
+  rest. The dashboards don't redirect: `/account` itself is a 404 rather
+  than a redirect to `/account/`, and a path the app doesn't know shows its
+  "Not found" page.
 
 ## 3. Signing in
 
 - **Users** sign in with their email and account password (PocketBase
-  `users` auth). **Admins** sign in as PocketBase superusers on `/admin/`.
+  `users` auth). **Admins** sign in as PocketBase superusers on `/admin`.
   The account password still never works for DAV.
 - The app keeps the PocketBase token in `sessionStorage` and sends it as
   `Authorization: Bearer` to `/api/*` and `/files/*`.
@@ -127,7 +131,7 @@ the admin UI, so its change log goes with it.
   rclone marks sensitive or passwords (including `access_key_id`) are
   write-only: the dashboard shows only that they are stored.
 - Sign-in is a PocketBase superuser at `/admin`, kept apart from the user
-  sign-in at `/account` (each page load knows which from its URL).
+  sign-in at `/` (each page load knows which from its URL).
 
 API (superuser token; all under `/api/nexus/admin`, in the same Huma API
 and OpenAPI document as the user dashboard). Saves go through the same
@@ -280,7 +284,7 @@ internal/shares/     the shares collection hooks and /s/ serving
 
 Each step is usable on its own; the riskiest comes last.
 
-1. The app shell, sign-in and the user dashboard, replacing `/account`.
+1. The app shell, sign-in and the user dashboard, replacing the old `/account` page.
    **Built** (without share links, which come with step 4).
 2. The admin dashboard. **Built.**
 3. Raw-file changes (§6.3), the Bearer token and cookie on `/files`, and the

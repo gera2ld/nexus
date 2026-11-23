@@ -121,7 +121,7 @@ didn't block the same client through another; with it, they did.
 
 1. Admin UI → `users` → New record: email and account password. There is
    no public sign-up.
-2. Each user signs in at `https://dav.example.com/account` and creates an
+2. Each user signs in at `https://dav.example.com/` and creates an
    App Password per device.
 3. Calendar and contacts apps: server `https://dav.example.com/`, the
    email, an App Password. Discovery finds the rest.

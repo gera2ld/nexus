@@ -155,7 +155,7 @@ Full design: [WEB.md](WEB.md).
 | Tasks (VTODO) in v1 | **Yes.** We store raw iCalendar, so tasks cost almost nothing to add. | **Decided** 2026-11-22 |
 | Who owns storage accounts | Only the admin defines storage accounts; users get mounts assigned to them. Users never see or enter storage credentials. | **Decided** 2026-11-22 |
 | Storage backends in v1 | Any rclone backend works underneath. The admin UI offers forms only for S3 and local disk. | Proposed |
-| Where users manage their own App Passwords | The user dashboard served by Nexus at `/account`. The PocketBase dashboard is for admins only. | **Decided** 2026-11-22 (built) |
+| Where users manage their own App Passwords | The user dashboard served by Nexus at `/`. The PocketBase dashboard is for admins only. | **Decided** 2026-11-22 (built) |
 
 ## 7. Status
 

@@ -590,11 +590,11 @@ func TestActivePasswordLimit(t *testing.T) {
 // /ui/ serves only built assets. Passes with or without a built app.
 func TestAccountPages(t *testing.T) {
 	s := newServer(t)
-	first := s.do("GET", "/account", nil, nil)
+	first := s.do("GET", "/", nil, nil)
 	if first.code != http.StatusOK || !strings.Contains(first.body, "<title>Nexus</title>") {
-		t.Fatalf("/account: %d %s", first.code, first.body)
+		t.Fatalf("/: %d %s", first.code, first.body)
 	}
-	for _, p := range []string{"/account/", "/account/calendars", "/account/app-passwords", "/admin", "/admin/mounts"} {
+	for _, p := range []string{"/account/calendars", "/account/app-passwords", "/admin", "/admin/mounts"} {
 		r := s.do("GET", p, nil, nil)
 		if r.code != http.StatusOK || r.body != first.body {
 			t.Errorf("%s: %d, want the app page", p, r.code)
@@ -603,9 +603,19 @@ func TestAccountPages(t *testing.T) {
 			t.Errorf("%s CSP = %q", p, csp)
 		}
 	}
-	for _, p := range []string{"/ui/", "/ui/index.html", "/ui/.gitkeep", "/ui/assets/missing.js"} {
+	for _, p := range []string{"/ui/", "/ui/index.html", "/ui/.gitkeep", "/ui/assets/missing.js", "/nothing-here"} {
 		if r := s.do("GET", p, nil, nil); r.code != http.StatusNotFound {
 			t.Errorf("%s: %d, want 404", p, r.code)
+		}
+	}
+	// /account is no page and no redirect: the app with a 404 status.
+	if r := s.do("GET", "/account", nil, nil); r.code != http.StatusNotFound || r.body != first.body {
+		t.Errorf("/account: %d, want the app page with 404", r.code)
+	}
+	// DAV clients probe the root before .well-known; only GET serves the page.
+	for _, m := range []string{"PROPFIND", "PUT", "OPTIONS"} {
+		if r := s.do(m, "/", nil, nil); r.code == http.StatusOK || r.code == http.StatusMultiStatus {
+			t.Errorf("%s /: %d, want no page", m, r.code)
 		}
 	}
 }

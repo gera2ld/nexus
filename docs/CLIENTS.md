@@ -19,7 +19,8 @@ Find Calendars, and New Address Book → CardDAV. Both were found on the
 first try.
 
 - **Discovery:** it first tries `HEAD`, `GET`, `PROPFIND` and `PUT` on `/`
-  (all 404, harmless), then follows `/.well-known/caldav` or
+  (`GET` and `HEAD` get the dashboard's page, `PROPFIND` and `PUT` a 404;
+  harmless), then follows `/.well-known/caldav` or
   `/.well-known/carddav` to `/dav/`, finds the principal and the home set,
   and lists the collections. Each new connection starts with one
   unauthenticated request (401, `signin: none` in the log).

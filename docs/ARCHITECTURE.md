@@ -49,7 +49,7 @@ the old auth proxy goes away.
 
 ```
 /_/ , /api/*                              PocketBase (admin dashboard, REST API)
-/account, /account/*                     user dashboard (the web app's index.html)
+/ (GET), /account/*                      user dashboard (the web app's index.html)
 /admin, /admin/*                         admin dashboard (the same app)
 /ui/*                                     the web app's built assets
 /api/nexus/admin/*                        admin dashboard API (PocketBase superuser token)
@@ -230,7 +230,7 @@ created when a user is created.
   addresses. The address comes from `RealIP()`, so behind a reverse proxy
   PocketBase's trusted-proxy setting must be configured, or every client
   shares the proxy's address.
-- **User dashboard** (`/account`; the app in `web/`, served by
+- **User dashboard** (`/` and `/account/*`; the app in `web/`, served by
   `internal/web`, its API in `internal/account`): a React app embedded in
   the binary, no external scripts, served with a strict CSP. It signs in
   with PocketBase's normal user password sign-in and keeps the token in
@@ -431,7 +431,7 @@ internal/davserver/ /dav router: principal, calendars/, contacts/; per-user tree
 internal/auth/   App Password auth for DAV: secrets, scopes, failed-sign-in limiter
 internal/account/ the user dashboard's /api/nexus API (Huma; generates api/openapi.json)
 internal/admin/  the admin dashboard's /api/nexus/admin API (storage accounts, mounts)
-internal/web/    the embedded web app: /account and /admin pages, /ui assets
+internal/web/    the embedded web app: /, /account and /admin pages, /ui assets
 web/             the web app's source (React, Vite)
 internal/storage/ storage accounts and mounts: secret encryption, save checks, rclone VFS manager
 internal/files/  /files WebDAV: per-user view of mounts over x/net/webdav, write checks, conditions

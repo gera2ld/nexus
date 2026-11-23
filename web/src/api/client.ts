@@ -13,7 +13,7 @@ type Problem = components["schemas"]["ErrorModel"];
 
 /**
  * Which PocketBase auth collection this page signs in to: /admin is for
- * superusers, everything else for users. The two never share a token, and
+ * superusers, everything else (/ and /account) for users. The two never share a token, and
  * moving between them is a full page load.
  */
 export const realm: "users" | "_superusers" = location.pathname.startsWith("/admin") ? "_superusers" : "users";
@@ -80,7 +80,15 @@ export async function unwrap<T>(
 
 // ---- PocketBase auth (not part of the Nexus API) ----
 
-type AuthResponse = { token: string; record: { id: string; email: string } };
+/** The signed-in PocketBase account; superusers have no name or avatar. */
+export type Account = { id: string; collectionId: string; email: string; name?: string; avatar?: string };
+
+type AuthResponse = { token: string; record: Account };
+
+/** The account's avatar image, if it has one. Avatars aren't protected files, so no token is needed. */
+export function avatarURL(a: Account): string | undefined {
+  return a.avatar ? `/api/files/${a.collectionId}/${a.id}/${encodeURIComponent(a.avatar)}` : undefined;
+}
 
 async function pb(path: string, init: RequestInit): Promise<AuthResponse> {
   const r = await fetch(`/api/collections/${realm}/${path}`, {
@@ -92,8 +100,8 @@ async function pb(path: string, init: RequestInit): Promise<AuthResponse> {
   return body as AuthResponse;
 }
 
-/** Signs in; returns the account's email. */
-export async function signIn(email: string, password: string): Promise<string> {
+/** Signs in; returns the account. */
+export async function signIn(email: string, password: string): Promise<Account> {
   const res = await pb("auth-with-password", {
     method: "POST",
     body: JSON.stringify({ identity: email, password }),
@@ -101,14 +109,14 @@ export async function signIn(email: string, password: string): Promise<string> {
     throw e.status === 400 ? new ApiError("Wrong email or password.", 400) : e;
   });
   token.set(res.token);
-  return res.record.email;
+  return res.record;
 }
 
-/** Swaps the stored token for a fresh one and returns the account's email; throws if it's no longer good. */
-export async function refresh(): Promise<string> {
+/** Swaps the stored token for a fresh one and returns the account; throws if it's no longer good. */
+export async function refresh(): Promise<Account> {
   const t = token.get();
   if (!t) throw new ApiError("Not signed in.", 401);
   const res = await pb("auth-refresh", { method: "POST", headers: { Authorization: t } });
   token.set(res.token);
-  return res.record.email;
+  return res.record;
 }

@@ -1,6 +1,7 @@
 // Package web serves the web app built from web/ (npm run build writes it
-// to dist). Every app path (/account and /admin) gets index.html and React
-// Router takes over; /ui/ serves the built assets.
+// to dist). Every app path (/, /account/… and /admin) gets index.html and
+// React Router takes over, showing its own "Not found" for unknown pages;
+// /ui/ serves the built assets.
 package web
 
 import (
@@ -32,18 +33,26 @@ func Register(r *router.Router[*core.RequestEvent]) {
 	if err != nil {
 		index = []byte(placeholder)
 	}
-	page := func(e *core.RequestEvent) error {
-		h := e.Response.Header()
-		h.Set("Cache-Control", "no-store")
-		h.Set("Content-Security-Policy", csp)
-		h.Set("X-Content-Type-Options", "nosniff")
-		h.Set("Referrer-Policy", "same-origin")
-		return e.HTML(http.StatusOK, string(index))
+	serve := func(status int) func(e *core.RequestEvent) error {
+		return func(e *core.RequestEvent) error {
+			h := e.Response.Header()
+			h.Set("Cache-Control", "no-store")
+			h.Set("Content-Security-Policy", csp)
+			h.Set("X-Content-Type-Options", "nosniff")
+			h.Set("Referrer-Policy", "same-origin")
+			return e.HTML(status, string(index))
+		}
 	}
-	for _, p := range []string{"/account", "/admin"} {
-		r.GET(p, page)
-		r.GET(p+"/{path...}", page)
-	}
+	page := serve(http.StatusOK)
+	// The home page is the user's overview. Only GET (and HEAD): other
+	// methods on / stay 404, as DAV clients probing the root expect.
+	r.GET("/{$}", page)
+	r.GET("/account/{path...}", page)
+	// /account itself isn't a page. Without this route Go's router would
+	// redirect it to /account/; instead it gets the app's "Not found".
+	r.GET("/account", serve(http.StatusNotFound))
+	r.GET("/admin", page)
+	r.GET("/admin/{path...}", page)
 
 	assets := http.StripPrefix("/ui/", http.FileServerFS(files))
 	r.GET("/ui/{path...}", func(e *core.RequestEvent) error {

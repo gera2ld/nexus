@@ -2,9 +2,9 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { CalendarDays, Contact, ExternalLink, HardDrive, House, KeyRound, Users } from "lucide-react";
-import { createBrowserRouter, Navigate, RouterProvider } from "react-router";
+import { createBrowserRouter, RouterProvider } from "react-router";
 import { ApiError, realm } from "@/api/client";
-import { Layout, Loading, type NavItem } from "@/components/Layout";
+import { Layout, Loading, NotFound, type NavItem } from "@/components/Layout";
 import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { Mounts } from "@/pages/admin/Mounts";
@@ -26,14 +26,14 @@ const queryClient = new QueryClient({
 });
 
 const accountNav: NavItem[] = [
-  { to: "/account", label: "Overview", icon: House, end: true },
+  { to: "/", label: "Overview", icon: House, end: true },
   { to: "/account/app-passwords", label: "App Passwords", icon: KeyRound },
   { to: "/account/calendars", label: "Calendars", icon: CalendarDays },
   { to: "/account/contacts", label: "Contacts", icon: Contact },
 ];
 
 const adminNav: NavItem[] = [
-  { to: "/admin/storage", label: "Storage", icon: HardDrive },
+  { to: "/admin", label: "Storage", icon: HardDrive, end: true },
   { to: "/admin/mounts", label: "Mounts", icon: Users },
 ];
 
@@ -44,36 +44,35 @@ const pocketbaseLink = (
   </a>
 );
 
-// /account and /admin are separate sign-ins (users and superusers), so each
+// The user pages (/ and /account) and /admin are separate sign-ins (users and superusers), so each
 // page load gets only its own routes; moving between them is a page load.
 const router = createBrowserRouter(
   realm === "users"
     ? [
         {
-          path: "/account",
+          // The overview is the home page; the rest live under /account.
+          path: "/",
           element: <Layout title="Nexus" nav={accountNav} />,
           children: [
             { index: true, element: <Overview /> },
-            { path: "app-passwords", element: <AppPasswords /> },
-            { path: "calendars", element: <Collections key="calendars" kind="calendars" /> },
-            { path: "contacts", element: <Collections key="addressbooks" kind="addressbooks" /> },
-            { path: "*", element: <Navigate to="/account" replace /> },
+            { path: "account/app-passwords", element: <AppPasswords /> },
+            { path: "account/calendars", element: <Collections key="calendars" kind="calendars" /> },
+            { path: "account/contacts", element: <Collections key="addressbooks" kind="addressbooks" /> },
+            { path: "*", element: <NotFound home="/" /> },
           ],
         },
-        { path: "*", element: <Navigate to="/account" replace /> },
       ]
     : [
         {
           path: "/admin",
           element: <Layout title="Nexus admin" nav={adminNav} extra={pocketbaseLink} />,
           children: [
-            { index: true, element: <Navigate to="/admin/storage" replace /> },
-            { path: "storage", element: <Storage /> },
+            // Storage is the admin home page, as the overview is the user's.
+            { index: true, element: <Storage /> },
             { path: "mounts", element: <Mounts /> },
-            { path: "*", element: <Navigate to="/admin/storage" replace /> },
+            { path: "*", element: <NotFound home="/admin" /> },
           ],
         },
-        { path: "*", element: <Navigate to="/admin" replace /> },
       ],
 );
 
