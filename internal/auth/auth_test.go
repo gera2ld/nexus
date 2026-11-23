@@ -95,15 +95,14 @@ func TestNormalizePaths(t *testing.T) {
 		want []string
 	}{
 		{nil, nil},
-		{[]string{"dav/calendars/personal"}, []string{"/dav/calendars/personal/"}},
-		{[]string{"/dav/files/docs/", " /dav/files/docs/ "}, []string{"/dav/files/docs/"}},
-		// "/dav/" is everything, stored as its parts.
-		{[]string{"/dav/", "/dav/files/docs/"}, []string{"/dav/calendars/", "/dav/contacts/", "/dav/files/", "/dav/files/docs/"}},
+		{[]string{"calendars/personal"}, []string{"/calendars/personal/"}},
+		{[]string{"/files/docs/", " /files/docs/ ", "/contacts/"}, []string{"/contacts/", "/files/docs/"}},
 		{[]string{"/"}, []string{"/"}},
-		// The user's own id, as in the addresses the account page shows.
-		{[]string{"/dav/files/u1/docs/", "/dav/u1/calendars/personal/"}, []string{"/dav/calendars/personal/", "/dav/files/docs/"}},
-		{[]string{"/dav/u1/"}, []string{"/dav/calendars/", "/dav/contacts/", "/dav/files/"}},
-		{[]string{"/dav/files/u1/"}, []string{"/dav/files/"}},
+		// Addresses as the dashboard shows them: /dav and the user's own id go.
+		{[]string{"/dav/files/u1/docs/", "/dav/u1/calendars/personal/"}, []string{"/calendars/personal/", "/files/docs/"}},
+		{[]string{"/dav/files/"}, []string{"/files/"}},
+		{[]string{"/dav/"}, []string{"/"}},
+		{[]string{"/dav/u1/"}, []string{"/"}},
 	} {
 		got, err := NormalizePaths(c.in, "u1")
 		if err != nil {
@@ -115,38 +114,18 @@ func TestNormalizePaths(t *testing.T) {
 		}
 	}
 	for _, in := range [][]string{
-		{""}, {"/dav/x/../y/"}, {"/api/"}, {"calendars/personal/"}, {`/dav\x/`},
-		// DAV entries stop at a collection.
-		{"/dav/calendars/personal/e1.ics"}, {"/dav/u2/calendars/personal/"}, {"/dav/x/"},
-		// The old /files/ addresses.
-		{"/files/docs/"},
+		{""}, {"/files/x/../y/"}, {"/api/"}, {"/dav/api/"}, {`/files\x/`},
+		// Calendar and contact entries stop at a collection.
+		{"/calendars/personal/e1.ics"}, {"/dav/u2/calendars/personal/"}, {"/x/"},
 	} {
 		if got, err := NormalizePaths(in, "u1"); err == nil {
 			t.Errorf("NormalizePaths(%q) = %v, want error", in, got)
 		}
 	}
-}
-
-func TestMigratePaths(t *testing.T) {
-	for _, c := range []struct {
-		in, want []string
-		changed  bool
-	}{
-		{nil, nil, false},
-		{[]string{"/dav/calendars/x/", "/dav/files/docs/"}, []string{"/dav/calendars/x/", "/dav/files/docs/"}, false},
-		{[]string{"/files/docs/", "/dav/calendars/x/"}, []string{"/dav/calendars/x/", "/dav/files/docs/"}, true},
-		// "/dav/" used to mean calendars and contacts only.
-		{[]string{"/dav/", "/dav/contacts/"}, []string{"/dav/calendars/", "/dav/contacts/"}, true},
-	} {
-		got, changed := MigratePaths(c.in)
-		if changed != c.changed || (c.changed && !reflect.DeepEqual(got, c.want)) {
-			t.Errorf("MigratePaths(%q) = %v %v, want %v %v", c.in, got, changed, c.want, c.changed)
-		}
-		if changed {
-			if again, ch := MigratePaths(got); ch || !reflect.DeepEqual(again, got) {
-				t.Errorf("MigratePaths(%q) again changed it to %v", got, again)
-			}
-		}
+	// Every invalid pattern is named, not just the first.
+	_, err := NormalizePaths([]string{"/x/", "/files/ok/", "/api/"}, "u1")
+	if err == nil || !strings.Contains(err.Error(), `"/x/"`) || !strings.Contains(err.Error(), `"/api/"`) || strings.Contains(err.Error(), "/files/ok/") {
+		t.Errorf("errors for two bad patterns: %v", err)
 	}
 }
 
@@ -159,19 +138,19 @@ func TestPathAllowed(t *testing.T) {
 		allowed []string
 		want    bool
 	}{
-		{"/dav/u1/", []string{"/dav/calendars/personal/"}, true},           // discovery
-		{"/dav/u1/calendars/", []string{"/dav/calendars/personal/"}, true}, // listing
-		{"/dav/u1/calendars/personal/", []string{"/dav/calendars/personal/"}, true},
-		{"/dav/u1/calendars/personal/x.ics", []string{"/dav/calendars/personal/"}, true},
-		{"/dav/u1/calendars/personal2/", []string{"/dav/calendars/personal/"}, false},
-		{"/dav/u1/contacts/contacts/", []string{"/dav/calendars/personal/"}, false},
-		{"/dav/u2/calendars/personal/", []string{"/dav/calendars/personal/"}, false},
-		{"/dav/u1/calendars/personal/../private/", []string{"/dav/calendars/personal/"}, false},
-		{"/dav/files/u1/docs/a.txt", []string{"/dav/calendars/personal/"}, false},
-		{"/dav/files/u1/", []string{"/dav/files/docs/"}, true},
-		{"/dav/files/u1/docs/a.txt", []string{"/dav/files/docs/"}, true},
-		{"/dav/files/u1/documents/a.txt", []string{"/dav/files/docs/"}, false},
-		{"/dav/u1/", []string{"/dav/files/docs/"}, false},
+		{"/dav/u1/", []string{"/calendars/personal/"}, true},           // discovery
+		{"/dav/u1/calendars/", []string{"/calendars/personal/"}, true}, // listing
+		{"/dav/u1/calendars/personal/", []string{"/calendars/personal/"}, true},
+		{"/dav/u1/calendars/personal/x.ics", []string{"/calendars/personal/"}, true},
+		{"/dav/u1/calendars/personal2/", []string{"/calendars/personal/"}, false},
+		{"/dav/u1/contacts/contacts/", []string{"/calendars/personal/"}, false},
+		{"/dav/u2/calendars/personal/", []string{"/calendars/personal/"}, false},
+		{"/dav/u1/calendars/personal/../private/", []string{"/calendars/personal/"}, false},
+		{"/dav/files/u1/docs/a.txt", []string{"/calendars/personal/"}, false},
+		{"/dav/files/u1/", []string{"/files/docs/"}, true},
+		{"/dav/files/u1/docs/a.txt", []string{"/files/docs/"}, true},
+		{"/dav/files/u1/documents/a.txt", []string{"/files/docs/"}, false},
+		{"/dav/u1/", []string{"/files/docs/"}, true}, // discovery: the principal lists nothing private
 		{"/dav/u1/calendars/personal/", []string{"/"}, true},
 	} {
 		got := PathAllowed(c.path, "u1", c.allowed)
@@ -182,7 +161,7 @@ func TestPathAllowed(t *testing.T) {
 }
 
 func TestRequestAllowedParentsOnlyDiscover(t *testing.T) {
-	allowed := []string{"/dav/files/docs/a/b/"}
+	allowed := []string{"/files/docs/a/b/"}
 	for _, c := range []struct {
 		method, path, depth string
 		want                bool

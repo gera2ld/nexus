@@ -176,8 +176,8 @@ func (a *AppPassword) Wrap(next http.Handler) http.Handler {
 			http.Error(w, "this App Password is not allowed to access "+r.URL.Path, http.StatusForbidden)
 			return
 		}
-		paths, err := NormalizePaths(pw.GetStringSlice("paths"), user.Id)
-		if err != nil || !RequestAllowed(r, user.Id, paths) {
+		paths := pw.GetStringSlice("paths")
+		if !RequestAllowed(r, user.Id, paths) {
 			setMeta(ctx, "signin", SignInPath)
 			http.Error(w, "this App Password is not allowed to access "+r.URL.Path, http.StatusForbidden)
 			return

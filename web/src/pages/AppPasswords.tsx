@@ -28,11 +28,12 @@ export function AppPasswords() {
   const [created, setCreated] = useState<AppPassword | null>(null);
   const [showRevoked, setShowRevoked] = useState(false);
 
-  const create = useAction((body: Values) => unwrap(api.POST("/app-passwords", { body })), ["app-passwords"]);
+  const create = useAction((body: Values) => unwrap(api.POST("/app-passwords", { body })), ["app-passwords"], undefined, true);
   const update = useAction(
     ({ id, ...body }: Values & { id: string }) => unwrap(api.PATCH("/app-passwords/{id}", { params: { path: { id } }, body })),
     ["app-passwords"],
     "App Password saved",
+    true,
   );
   const revoke = useAction(
     (id: string) => unwrap(api.POST("/app-passwords/{id}/revoke", { params: { path: { id } } })),
@@ -51,7 +52,12 @@ export function AppPasswords() {
         title="App Passwords"
         description="Each app or device gets its own password, limited to what it needs. Revoking one stops only that app."
       >
-        <Button onClick={() => setCreating(true)}>
+        <Button
+          onClick={() => {
+            create.reset();
+            setCreating(true);
+          }}
+        >
           <Plus /> New App Password
         </Button>
       </PageHeader>
@@ -94,7 +100,16 @@ export function AppPasswords() {
                   <TableCell className="text-right whitespace-nowrap">
                     {!p.revokedAt && (
                       <>
-                        <Button variant="ghost" size="sm" onClick={() => setEditing(p)}>Edit</Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            update.reset();
+                            setEditing(p);
+                          }}
+                        >
+                          Edit
+                        </Button>
                         <Button variant="ghost" size="sm" className="text-destructive" onClick={() => setRevoking(p)}>Revoke</Button>
                       </>
                     )}
@@ -118,6 +133,7 @@ export function AppPasswords() {
         title="New App Password"
         submit="Create"
         busy={create.isPending}
+        error={create.error?.message}
         initial={{ label: "", scopes: ["cal", "card"], paths: [] }}
         onSubmit={(v) =>
           create.mutate(v, {
@@ -137,6 +153,7 @@ export function AppPasswords() {
           description="Changes apply at once. The password itself stays the same."
           submit="Save"
           busy={update.isPending}
+          error={update.error?.message}
           initial={editing}
           onSubmit={(v) => update.mutate({ id: editing.id, ...v }, { onSuccess: () => setEditing(null) })}
         />
@@ -185,6 +202,8 @@ function PasswordForm(props: {
   description?: string;
   submit: string;
   busy: boolean;
+  /** The last save's error, shown in the form. */
+  error?: string;
   initial: Values;
   onSubmit: (v: Values) => void;
 }) {
@@ -230,12 +249,20 @@ function PasswordForm(props: {
               id="pw-paths"
               name="paths"
               defaultValue={props.initial.paths.join("\n")}
-              placeholder={"/dav/calendars/personal/\n/dav/files/docs/"}
+              placeholder={"/calendars/personal/\n/files/docs/"}
               className="font-mono text-sm"
               rows={3}
             />
-            <p className="text-xs text-muted-foreground">One per line. Leave empty to allow everything the boxes above allow.</p>
+            <p className="text-xs text-muted-foreground">
+              One per line, under /files/, /calendars/ or /contacts/. A /dav prefix is removed. Leave empty to allow
+              everything the boxes above allow.
+            </p>
           </div>
+          {props.error && (
+            <p role="alert" className="text-sm text-destructive">
+              {props.error}
+            </p>
+          )}
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => props.onOpenChange(false)}>Cancel</Button>
             <Button type="submit" disabled={props.busy || scopes.length === 0}>{props.submit}</Button>

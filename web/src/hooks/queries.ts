@@ -16,7 +16,8 @@ export const useCollections = (kind: Kind) =>
   });
 
 /** A mutation that refreshes `keys` afterwards and toasts its error. */
-export function useAction<A, R>(fn: (a: A) => Promise<R>, keys: string[], done?: string) {
+/** A mutation that refreshes keys and toasts; `quiet` leaves errors to the caller. */
+export function useAction<A, R>(fn: (a: A) => Promise<R>, keys: string[], done?: string, quiet = false) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: fn,
@@ -24,6 +25,8 @@ export function useAction<A, R>(fn: (a: A) => Promise<R>, keys: string[], done?:
       for (const k of keys) qc.invalidateQueries({ queryKey: [k] });
       if (done) toast.success(done);
     },
-    onError: (e) => toast.error(e.message),
+    onError: (e) => {
+      if (!quiet) toast.error(e.message);
+    },
   });
 }

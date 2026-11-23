@@ -16,7 +16,7 @@ Product scope: [PRODUCT.md](PRODUCT.md) §3.5. Server architecture:
 |---|---|
 | Framework | React, React Router, shadcn/ui on Tailwind, TanStack Query; built with Vite. shadcn/ui is React-first; the Vue port lags behind it |
 | Shipping | `npm run build` output is embedded in the Go binary (`go:embed`), so Nexus stays one binary and one image |
-| Raw files | `/dav/files/{uid}/…`: WebDAV, next to calendars and contacts under `/dav` (moved from `/files` on 2026-11-23) |
+| Raw files | `/dav/files/{uid}/…`: WebDAV, next to calendars and contacts under `/dav` |
 | Files page | `/files/{uid}/…`: the same path without the `/dav` prefix |
 | Published folders | Share links at `/s/{token}/…` on the main domain. A folder serves its `index.html`; relative paths are the author's job. No subdomains |
 | Isolation | Share responses are sandboxed without `allow-same-origin` (§6.4) |

@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"path"
@@ -14,16 +15,19 @@ const (
 	maxPathsSize = 8192 // keep within app_passwords.paths maxSize
 )
 
-// NormalizePaths validates and normalizes the optional path prefixes an App
-// Password is restricted to. Prefixes are user-rooted, e.g.
-// "/dav/calendars/personal/" or "/dav/files/docs/". The addresses users see
-// include their id ("/dav/files/{uid}/docs/"), so the user's own id is
-// removed. Every entry ends with a slash, so a sibling like "personal2/"
-// can never match "personal/". Calendar and contact entries stop at a
-// calendar or address book: below that, discovery on the collection would
-// list objects the password may not read. "/dav/" is stored as its three
-// parts, so stored rules never hold it (see MigratePaths). An empty list
+// NormalizePaths validates and normalizes the path patterns an App
+// Password is restricted to, when they are saved. Every path a password
+// can reach is under /dav, so patterns leave it out: "/calendars/personal/",
+// "/contacts/", "/files/docs/", or "/" for everything. A "/dav" prefix and
+// the user's own id are removed, so addresses copied from the dashboard
+// work ("/dav/files/{uid}/docs/" is "/files/docs/"). Every entry ends with
+// a slash, so a sibling like "personal2/" can never match "personal/".
+// Calendar and contact entries stop at a calendar or address book: below
+// that, discovery on the collection would list objects the password may
+// not read. Invalid patterns are all named in one error. An empty list
 // means unrestricted.
+//
+// Requests use the saved patterns as they are.
 func NormalizePaths(in []string, uid string) ([]string, error) {
 	if len(in) == 0 {
 		return nil, nil
@@ -33,51 +37,34 @@ func NormalizePaths(in []string, uid string) ([]string, error) {
 	}
 	seen := map[string]bool{}
 	out := make([]string, 0, len(in))
+	var bad, invalid []string
 	total := 0
 	for _, raw := range in {
-		p := strings.TrimSpace(raw)
-		if p == "" {
-			return nil, fmt.Errorf("a path must not be empty")
+		p, err := normalizePath(raw, uid)
+		if errors.Is(err, errInvalidPath) {
+			invalid = append(invalid, fmt.Sprintf("%q", strings.TrimSpace(raw)))
+			continue
 		}
-		if strings.Contains(p, `\`) {
-			return nil, fmt.Errorf("path %q must not contain a backslash", raw)
+		if err != nil {
+			bad = append(bad, err.Error())
+			continue
 		}
-		for _, seg := range strings.Split(p, "/") {
-			if seg == ".." {
-				return nil, fmt.Errorf("path %q must not contain ..", raw)
-			}
+		if !seen[p] {
+			seen[p] = true
+			out = append(out, p)
+			total += len(p)
 		}
-		p = path.Clean("/" + strings.TrimPrefix(p, "/"))
-		if !strings.HasSuffix(p, "/") {
-			p += "/"
+	}
+	if len(invalid) > 0 {
+		what := "aren't valid paths"
+		if len(invalid) == 1 {
+			what = "isn't a valid path"
 		}
-		if p != "/" && !strings.HasPrefix(p, "/dav/") {
-			return nil, fmt.Errorf("path %q must start with /dav/", raw)
-		}
-		if uid != "" {
-			for _, ns := range []string{FilesPrefix + "/", "/dav/"} {
-				if rest, ok := strings.CutPrefix(p, ns+uid+"/"); ok {
-					p = ns + rest
-					break
-				}
-			}
-		}
-		parts := []string{p}
-		if p == "/dav/" {
-			parts = davParts
-		} else if rest, ok := strings.CutPrefix(p, "/dav/"); ok && !IsFilesPath(p) {
-			segs := strings.Split(strings.TrimSuffix(rest, "/"), "/")
-			if (segs[0] != "calendars" && segs[0] != "contacts") || len(segs) > 2 {
-				return nil, fmt.Errorf("path %q must be in /dav/files/, or be /dav/calendars/, /dav/contacts/ or one calendar or address book in them", raw)
-			}
-		}
-		for _, p := range parts {
-			if !seen[p] {
-				seen[p] = true
-				out = append(out, p)
-				total += len(p)
-			}
-		}
+		bad = append(bad, strings.Join(invalid, ", ")+" "+what+
+			": use /files/…, /calendars/ or /contacts/, or one calendar or address book in them")
+	}
+	if len(bad) > 0 {
+		return nil, errors.New(strings.Join(bad, "; "))
 	}
 	if total > maxPathsSize {
 		return nil, fmt.Errorf("paths are too long")
@@ -86,35 +73,50 @@ func NormalizePaths(in []string, uid string) ([]string, error) {
 	return out, nil
 }
 
-// davParts is what "/dav/" covers: everything a password can reach.
-var davParts = []string{"/dav/calendars/", "/dav/contacts/", FilesPrefix + "/"}
-
-// MigratePaths rewrites path rules stored before files moved from /files to
-// /dav/files: "/files/x/" becomes "/dav/files/x/", and "/dav/", which then
-// meant calendars and contacts only, becomes those two. NormalizePaths
-// never stores either form, so running this again changes nothing. ok is
-// false when there was nothing to change.
-func MigratePaths(in []string) (out []string, ok bool) {
-	seen := map[string]bool{}
-	for _, p := range in {
-		var repl []string
-		switch {
-		case strings.HasPrefix(p, "/files/"):
-			repl, ok = []string{"/dav" + p}, true
-		case p == "/dav/":
-			repl, ok = davParts[:2], true
-		default:
-			repl = []string{p}
+func normalizePath(raw, uid string) (string, error) {
+	p := strings.TrimSpace(raw)
+	if p == "" {
+		return "", fmt.Errorf("a path must not be empty")
+	}
+	if strings.Contains(p, `\`) {
+		return "", fmt.Errorf("%q must not contain a backslash", raw)
+	}
+	for _, seg := range strings.Split(p, "/") {
+		if seg == ".." {
+			return "", fmt.Errorf("%q must not contain ..", raw)
 		}
-		for _, r := range repl {
-			if !seen[r] {
-				seen[r] = true
-				out = append(out, r)
+	}
+	p = path.Clean("/" + strings.TrimPrefix(p, "/"))
+	if !strings.HasSuffix(p, "/") {
+		p += "/"
+	}
+	if uid != "" {
+		for _, ns := range []string{FilesPrefix + "/", "/dav/"} {
+			if rest, ok := strings.CutPrefix(p, ns+uid+"/"); ok {
+				p = ns + rest
+				break
 			}
 		}
 	}
-	sort.Strings(out)
-	return out, ok
+	if rest, ok := strings.CutPrefix(p, "/dav/"); ok {
+		p = "/" + rest
+	}
+	if !validRule(p) {
+		return "", errInvalidPath
+	}
+	return p, nil
+}
+
+var errInvalidPath = errors.New("invalid path")
+
+// validRule accepts "/", anything in "/files/", and "/calendars/" or
+// "/contacts/" down to one collection.
+func validRule(p string) bool {
+	if p == "/" || strings.HasPrefix(p, "/files/") {
+		return true
+	}
+	segs := strings.Split(strings.Trim(p, "/"), "/")
+	return (segs[0] == "calendars" || segs[0] == "contacts") && len(segs) <= 2
 }
 
 // Access is what a restricted App Password may do at a path.
@@ -145,9 +147,7 @@ func PathAccess(reqPath, uid string, allowed []string) Access {
 		switch {
 		case p == "/" || strings.HasPrefix(rel, p):
 			return Full
-		// A parent of the rule, but a file rule doesn't open discovery on
-		// the calendar and contact side of /dav.
-		case strings.HasPrefix(p, rel) && (IsFilesPath(rel) || !IsFilesPath(p)):
+		case strings.HasPrefix(p, rel):
 			access = Discover
 		}
 	}
@@ -184,19 +184,20 @@ func RequestAllowed(r *http.Request, uid string, allowed []string) bool {
 // refused the request, for checks made after the auth middleware.
 func MarkPathDenied(ctx context.Context) { setMeta(ctx, "signin", SignInPath) }
 
-// userRelativePath removes the "/dav/files/{uid}" or "/dav/{uid}" prefix
-// from a request path, leaving the form used in stored rules. It refuses
-// paths under another user's id.
+// userRelativePath turns a request path into the form rules use: without
+// "/dav" and the user's id, so "/dav/files/{uid}/docs/a" is "/files/docs/a/"
+// and "/dav/{uid}/calendars/" is "/calendars/". It refuses paths under
+// another user's id.
 func userRelativePath(reqPath, uid string) (string, bool) {
 	for _, ns := range []string{FilesPrefix, "/dav"} {
-		base := ns + "/"
-		if reqPath == ns {
-			return base, true
+		if reqPath == ns || reqPath == ns+"/" {
+			return strings.TrimPrefix(ns, "/dav") + "/", true
 		}
-		if !strings.HasPrefix(reqPath, base) {
+		rest, ok := strings.CutPrefix(reqPath, ns+"/")
+		if !ok {
 			continue
 		}
-		rest := strings.TrimPrefix(reqPath, base)
+		base := strings.TrimPrefix(ns, "/dav") + "/"
 		if rest == uid {
 			return base, true
 		}

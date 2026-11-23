@@ -43,7 +43,7 @@ func TestDashboardEditAppPassword(t *testing.T) {
 	}
 
 	r = patch(pw.ID, map[string]any{"scopes": []string{"cal", "card"}, "paths": []string{"/dav/" + u.Id + "/contacts/"}}, tok)
-	if got := decode[account.AppPassword](t, r); r.code != http.StatusOK || strings.Join(got.Paths, ",") != "/dav/contacts/" {
+	if got := decode[account.AppPassword](t, r); r.code != http.StatusOK || strings.Join(got.Paths, ",") != "/contacts/" {
 		t.Fatalf("PATCH paths (pasted with the user id): %d %s", r.code, r.body)
 	}
 	if code := s.propfind(cal, creds); code != http.StatusForbidden {

@@ -420,31 +420,30 @@ func TestFilesRawHeaders(t *testing.T) {
 	}
 }
 
-// TestMigratePasswordPaths: path limits saved while files lived at /files
-// are rewritten at startup, and keep working.
-func TestMigratePasswordPaths(t *testing.T) {
+// TestSavedPatternsAsTheyAre: requests use saved patterns as they are.
+// "/files/docs/" (also the form used before files moved under /dav) works;
+// a pattern saved in another form, like the old "/dav/", matches nothing,
+// so it fails closed until the password is edited.
+func TestSavedPatternsAsTheyAre(t *testing.T) {
 	f := newFilesEnv(t)
-	pw := f.newPasswordWithPaths(f.userTok, "old", []string{"/dav/files/docs/"}, "files", "cal")
+	pw := f.newPassword(f.userTok, "old", "files", "cal")
 	rec, err := f.app.FindRecordById(schema.AppPasswords, pw.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	rec.Set("paths", []string{"/dav/", "/files/docs/"}) // as stored before the move
+	rec.Set("paths", []string{"/dav/", "/files/docs/"}) // as saved before the move
 	if err := f.app.Save(rec); err != nil {
 		t.Fatal(err)
 	}
-	if err := migratePasswordPaths(f.app); err != nil {
-		t.Fatal(err)
-	}
-	rec, _ = f.app.FindRecordById(schema.AppPasswords, pw.ID)
-	if got := strings.Join(rec.GetStringSlice("paths"), ","); got != "/dav/calendars/,/dav/contacts/,/dav/files/docs/" {
-		t.Fatalf("migrated paths: %s", got)
-	}
 	creds := basic("ada@example.com", pw.Secret)
-	if r := f.do("PROPFIND", f.base+"/docs/", nil, func(r *http.Request) { creds(r); r.Header.Set("Depth", "1") }); r.code != http.StatusMultiStatus {
-		t.Errorf("docs after the rewrite: %d", r.code)
-	}
-	if r := f.do("PROPFIND", f.base+"/scratch/", nil, func(r *http.Request) { creds(r); r.Header.Set("Depth", "1") }); r.code != http.StatusForbidden {
-		t.Errorf("scratch (old /dav/ didn't cover files): %d, want 403", r.code)
+	depth1 := func(r *http.Request) { creds(r); r.Header.Set("Depth", "1") }
+	for p, want := range map[string]int{
+		f.base + "/docs/":                        http.StatusMultiStatus,
+		f.base + "/scratch/":                     http.StatusForbidden,
+		"/dav/" + f.uid + "/calendars/personal/": http.StatusForbidden,
+	} {
+		if r := f.do("PROPFIND", p, nil, depth1); r.code != want {
+			t.Errorf("PROPFIND %s: %d, want %d", p, r.code, want)
+		}
 	}
 }

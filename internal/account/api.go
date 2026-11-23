@@ -150,7 +150,7 @@ type createPasswordInput struct {
 	Body struct {
 		Label  string   `json:"label" minLength:"1" maxLength:"100"`
 		Scopes []string `json:"scopes" minItems:"1" enum:"cal,card,files"`
-		Paths  []string `json:"paths,omitempty" doc:"Optional path limits, e.g. /dav/calendars/personal/ or /dav/files/docs/"`
+		Paths  []string `json:"paths,omitempty" doc:"Optional path limits, e.g. /calendars/personal/ or /files/docs/. A /dav prefix and your user id are removed; invalid ones are refused (422)."`
 	}
 }
 

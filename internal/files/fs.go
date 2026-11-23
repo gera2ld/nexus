@@ -162,7 +162,7 @@ func mountAllowed(allowed []string, name string) bool {
 	if len(allowed) == 0 {
 		return true
 	}
-	prefix := Prefix + "/" + name + "/"
+	prefix := "/files/" + name + "/" // the form rules use (auth.NormalizePaths)
 	for _, p := range allowed {
 		if strings.HasPrefix(p, prefix) || strings.HasPrefix(prefix, p) {
 			return true

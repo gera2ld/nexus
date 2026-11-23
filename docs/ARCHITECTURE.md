@@ -213,20 +213,16 @@ created when a user is created.
   `files`, and discovery (`/dav/`, `/dav/{uid}/`) accepts either `cal` or
   `card`. A wrong scope gets 403.
 - **Path restriction:** a password can optionally carry `paths`, a JSON list
-  of user-rooted prefixes, e.g. `/dav/calendars/personal/` or
-  `/dav/files/docs/`. The API normalises every entry to start and end with
-  `/`, so siblings can't match by accident, removes the user's own id (so
-  addresses copied from the dashboard work), and refuses anything outside
-  `/dav/` (including `..`). Calendar and contact entries stop at a
-  calendar or address book, since discovery on a collection would list
-  objects the password may not read. `/dav/` is stored as its three parts
-  (`/dav/calendars/`, `/dav/contacts/`, `/dav/files/`), and a file rule
-  gives no discovery on the calendar and contact side.
-- **Moved from `/files`** (2026-11-23): files used to live at
-  `/files/{uid}/`. At startup, stored rules are rewritten: `/files/x/`
-  becomes `/dav/files/x/`, and `/dav/`, which then meant calendars and
-  contacts only, becomes those two. Clients set up with the old address
-  must be changed; `/files` is now the web app's page.
+  of prefixes under `/dav`, written without it: `/calendars/personal/`,
+  `/contacts/`, `/files/docs/`, or `/` for everything. Patterns are
+  normalised when saved: each starts and ends with `/`, so siblings can't
+  match by accident; a `/dav` prefix and the user's own id are removed, so
+  addresses copied from the dashboard work. Anything else is refused with a
+  422 naming every invalid pattern: outside `/files/`, `/calendars/` and
+  `/contacts/`, containing `..` or a backslash, or below a calendar or
+  address book (discovery on a collection would list objects the password
+  may not read). Requests compare the request path, without `/dav` and the
+  user id, against the saved patterns as they are.
 - **What a restricted password may do:** anything inside a listed path.
   On a parent of one (the DAV principal and homes, a mount root, folders
   on the way down) only `OPTIONS` and `PROPFIND` with `Depth` 0 or 1, and
@@ -234,7 +230,7 @@ created when a user is created.
   backends filter calendars, address books, mounts and folders. Writes,
   COPY, MOVE, LOCK, GET and Depth-infinity listings on a parent get 403, as
   does a COPY or MOVE `Destination` that isn't inside an allowed path.
-  An empty list keeps the old, unrestricted behaviour. `paths` is stored
+  An empty list means unrestricted. `paths` is stored
   on the record, carried through the request context, and shown in the log
   meta as `signin: path` when it denies a request.
 - **`last_used_at`** is written at most once a minute per password.

@@ -53,10 +53,7 @@ func Setup(app core.App) error {
 		if err := e.Next(); err != nil {
 			return err
 		}
-		if err := schema.Apply(e.App); err != nil {
-			return err
-		}
-		return migratePasswordPaths(e.App)
+		return schema.Apply(e.App)
 	})
 
 	app.OnRecordCreateExecute(schema.Users).BindFunc(createDefaultCollections)
@@ -149,25 +146,4 @@ func RegisterRoutes(r *router.Router[*core.RequestEvent], dav http.Handler) {
 	g := r.Group("/dav")
 	g.Unbind(davUnbind...)
 	g.Any("/{path...}", serve)
-}
-
-// migratePasswordPaths rewrites App Password path limits stored before
-// files moved from /files to /dav/files (auth.MigratePaths).
-func migratePasswordPaths(app core.App) error {
-	recs, err := app.FindAllRecords(schema.AppPasswords)
-	if err != nil {
-		return err
-	}
-	for _, r := range recs {
-		paths, changed := auth.MigratePaths(r.GetStringSlice("paths"))
-		if !changed {
-			continue
-		}
-		r.Set("paths", paths)
-		if err := app.Save(r); err != nil {
-			return err
-		}
-		app.Logger().Info("nexus: moved App Password path limits to /dav/files", "id", r.Id, "paths", paths)
-	}
-	return nil
 }

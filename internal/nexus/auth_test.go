@@ -246,8 +246,8 @@ func TestAppPasswordPaths(t *testing.T) {
 	}
 
 	pw := s.newPasswordWithPaths(tok, "one calendar", []string{"/dav/calendars/personal"}, "cal", "card", "files")
-	if got := strings.Join(pw.Paths, ","); got != "/dav/calendars/personal/" {
-		t.Errorf("stored paths = %q, want trailing-slash normalisation", got)
+	if got := strings.Join(pw.Paths, ","); got != "/calendars/personal/" {
+		t.Errorf("stored paths = %q, want it without /dav, with a trailing slash", got)
 	}
 	home := "/dav/" + u.Id + "/"
 	cal := home + "calendars/personal/"

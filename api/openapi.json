@@ -390,7 +390,7 @@
             "type": "string"
           },
           "paths": {
-            "description": "Optional path limits, e.g. /dav/calendars/personal/ or /dav/files/docs/",
+            "description": "Optional path limits, e.g. /calendars/personal/ or /files/docs/. A /dav prefix and your user id are removed; invalid ones are refused (422).",
             "items": {
               "type": "string"
             },
