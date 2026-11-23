@@ -580,17 +580,27 @@ func TestActivePasswordLimit(t *testing.T) {
 	}
 }
 
-func TestAccountPage(t *testing.T) {
+// TestAccountPages: every app path gets the same page with a strict CSP;
+// /ui/ serves only built assets. Passes with or without a built app.
+func TestAccountPages(t *testing.T) {
 	s := newServer(t)
-	r := s.do("GET", "/account", nil, nil)
-	if r.code != http.StatusOK || !strings.Contains(r.body, "App Password") {
-		t.Fatalf("/account: %d", r.code)
+	first := s.do("GET", "/account", nil, nil)
+	if first.code != http.StatusOK || !strings.Contains(first.body, "<title>Nexus</title>") {
+		t.Fatalf("/account: %d %s", first.code, first.body)
 	}
-	if csp := r.hdr.Get("Content-Security-Policy"); !strings.Contains(csp, "frame-ancestors 'none'") {
-		t.Errorf("CSP = %q", csp)
+	for _, p := range []string{"/account/", "/account/calendars", "/account/app-passwords"} {
+		r := s.do("GET", p, nil, nil)
+		if r.code != http.StatusOK || r.body != first.body {
+			t.Errorf("%s: %d, want the app page", p, r.code)
+		}
+		if csp := r.hdr.Get("Content-Security-Policy"); !strings.Contains(csp, "script-src 'self';") || !strings.Contains(csp, "frame-ancestors 'none'") {
+			t.Errorf("%s CSP = %q", p, csp)
+		}
 	}
-	if strings.Contains(r.body, "innerHTML") {
-		t.Error("page uses innerHTML; render user data with textContent")
+	for _, p := range []string{"/ui/", "/ui/index.html", "/ui/.gitkeep", "/ui/assets/missing.js"} {
+		if r := s.do("GET", p, nil, nil); r.code != http.StatusNotFound {
+			t.Errorf("%s: %d, want 404", p, r.code)
+		}
 	}
 }
 

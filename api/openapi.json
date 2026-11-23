@@ -30,10 +30,7 @@
             "items": {
               "type": "string"
             },
-            "type": [
-              "array",
-              "null"
-            ]
+            "type": "array"
           },
           "revokedAt": {
             "type": "string"
@@ -47,10 +44,7 @@
               ],
               "type": "string"
             },
-            "type": [
-              "array",
-              "null"
-            ]
+            "type": "array"
           },
           "secret": {
             "description": "Only in the create response; shown once",
@@ -93,10 +87,7 @@
               ],
               "type": "string"
             },
-            "type": [
-              "array",
-              "null"
-            ]
+            "type": "array"
           },
           "description": {
             "type": "string"
@@ -179,10 +170,7 @@
               ],
               "type": "string"
             },
-            "type": [
-              "array",
-              "null"
-            ]
+            "type": "array"
           },
           "description": {
             "maxLength": 2000,
@@ -221,10 +209,7 @@
             "items": {
               "type": "string"
             },
-            "type": [
-              "array",
-              "null"
-            ]
+            "type": "array"
           },
           "scopes": {
             "items": {
@@ -236,10 +221,7 @@
               "type": "string"
             },
             "minItems": 1,
-            "type": [
-              "array",
-              "null"
-            ]
+            "type": "array"
           }
         },
         "required": [
@@ -289,10 +271,7 @@
             "items": {
               "$ref": "#/components/schemas/ErrorDetail"
             },
-            "type": [
-              "array",
-              "null"
-            ]
+            "type": "array"
           },
           "instance": {
             "description": "A URI reference that identifies the specific occurrence of the problem.",
@@ -351,10 +330,7 @@
             "items": {
               "$ref": "#/components/schemas/Mount"
             },
-            "type": [
-              "array",
-              "null"
-            ]
+            "type": "array"
           },
           "server": {
             "description": "Origin clients should use, e.g. https://dav.example.com",
@@ -472,10 +448,7 @@
               "type": "string"
             },
             "minItems": 1,
-            "type": [
-              "array",
-              "null"
-            ]
+            "type": "array"
           }
         },
         "type": "object"
@@ -507,10 +480,7 @@
                   "items": {
                     "$ref": "#/components/schemas/Collection"
                   },
-                  "type": [
-                    "array",
-                    "null"
-                  ]
+                  "type": "array"
                 }
               }
             },
@@ -706,10 +676,7 @@
                   "items": {
                     "$ref": "#/components/schemas/AppPassword"
                   },
-                  "type": [
-                    "array",
-                    "null"
-                  ]
+                  "type": "array"
                 }
               }
             },
@@ -874,10 +841,7 @@
                   "items": {
                     "$ref": "#/components/schemas/Collection"
                   },
-                  "type": [
-                    "array",
-                    "null"
-                  ]
+                  "type": "array"
                 }
               }
             },

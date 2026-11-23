@@ -42,15 +42,16 @@ the old auth proxy goes away.
 | iCalendar / vCard | `emersion/go-ical`, `emersion/go-vcard` | |
 | Calendar and contact data | Raw ICS / VCF text in SQLite, plus indexed fields | |
 | File contents | rclone backend | Never in SQLite |
-| Admin UI | PocketBase dashboard, plus a small account page | |
+| Admin UI | PocketBase dashboard, plus the web app's user dashboard | |
 | Deployment | One Docker container, plus persistent data and config volumes | |
 
 ## 3. HTTP surface
 
 ```
 /_/ , /api/*                              PocketBase (admin dashboard, REST API)
-/account                                  account page: create and revoke App Passwords
-/api/nexus/*                              account page API (PocketBase user token)
+/account, /account/*                     user dashboard (the web app's index.html)
+/ui/*                                     the web app's built assets
+/api/nexus/*                              dashboard API (PocketBase user token)
 /.well-known/caldav, /.well-known/carddav 301 → /dav/
 /dav/                                     current-user-principal discovery
 /dav/{uid}/                               principal (advertises both home sets)
@@ -182,7 +183,7 @@ created when a user is created.
 
 - **DAV and file endpoints** use HTTP Basic: the account email plus an App
   Password. The account's own password is never accepted there; it only works
-  for the account page and the admin UI.
+  for the dashboard and the admin UI.
 - **Email lookup is case-insensitive.** The `users` email unique index is
   `COLLATE NOCASE`, which PocketBase's `FindAuthRecordByEmail` and its
   password sign-in both honour. It also stops two accounts that differ only
@@ -203,7 +204,7 @@ created when a user is created.
   of user-rooted prefixes with the service namespace, e.g.
   `/dav/calendars/personal/` or `/files/docs/`. The API normalises every
   entry to start and end with `/`, so siblings can't match by accident,
-  removes the user's own id (so addresses copied from the account page
+  removes the user's own id (so addresses copied from the dashboard
   work), and refuses anything outside `/dav/` or `/files/` (including
   `..`). DAV entries stop at a calendar or address book, since discovery
   on a collection would list objects the password may not read.
@@ -227,12 +228,13 @@ created when a user is created.
   addresses. The address comes from `RealIP()`, so behind a reverse proxy
   PocketBase's trusted-proxy setting must be configured, or every client
   shares the proxy's address.
-- **Account page** (`/account`, `internal/account`): one static page, no
-  external scripts, served with a strict CSP. It signs in with PocketBase's
-  normal user password sign-in and keeps the token in `sessionStorage`. It
-  calls `/api/nexus/me`, `GET/POST /api/nexus/app-passwords` and
-  `POST /api/nexus/app-passwords/{id}/revoke`, which require a user token
-  (superuser tokens and App Passwords are refused). `app_passwords` itself
+- **User dashboard** (`/account`; the app in `web/`, served by
+  `internal/web`, its API in `internal/account`): a React app embedded in
+  the binary, no external scripts, served with a strict CSP. It signs in
+  with PocketBase's normal user password sign-in and keeps the token in
+  `sessionStorage`. The API under `/api/nexus` (App Passwords, calendars,
+  address books; [WEB.md](WEB.md) §4) requires a user token (superuser
+  tokens and App Passwords are refused). `app_passwords` itself
   stays superuser-only, so hashes never leave the server. At most 50 active
   App Passwords per user. Rate limiting of the account-password sign-in is
   PocketBase's own (its rate-limit settings), not ours.
@@ -377,7 +379,7 @@ rclone maintains and tests, so the first real S3 mount is the check.
   so admin commands need no `--dir`) and `/files` for local-disk storage.
   The container passes `scripts/probe.sh` and keeps its data across a
   restart. The only setting is `NEXUS_ENC_KEY`; no public-URL setting is needed,
-  because the account page takes the address from `Host` and
+  because the dashboard takes the address from `Host` and
   `X-Forwarded-Proto`.
 - **Behind a proxy**, PocketBase's "IP proxy headers" setting must name
   `X-Forwarded-For`, or every client shares the proxy's address for the
@@ -422,14 +424,16 @@ internal/schema/ embedded collections snapshot (collections.json) + Apply
 internal/store/  CalDAV/CardDAV backends on PocketBase collections; shared write path and sync
 internal/davserver/ /dav router: principal, calendars/, contacts/; per-user tree check
 internal/auth/   App Password auth for DAV: secrets, scopes, failed-sign-in limiter
-internal/account/ /account page and its /api/nexus API
+internal/account/ the dashboard's /api/nexus API (Huma; generates api/openapi.json)
+internal/web/    the embedded web app: /dashboards and /ui assets
+web/             the web app's source (React, Vite)
 internal/storage/ storage accounts and mounts: secret encryption, save checks, rclone VFS manager
 internal/files/  /files WebDAV: per-user view of mounts over x/net/webdav, write checks, conditions
 internal/principal/ authenticated user id in the request context
 scripts/probe.sh end-to-end check of a running server (curl)
 ```
 
-The web app adds `web/`, `internal/web/` and `internal/shares/`
+Share links will add `internal/shares/`
 ([WEB.md](WEB.md) §7).
 
 ## 11. Open technical questions

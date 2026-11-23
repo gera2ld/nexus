@@ -19,6 +19,7 @@ import (
 	"nexus/internal/schema"
 	"nexus/internal/storage"
 	"nexus/internal/store"
+	"nexus/internal/web"
 )
 
 // ChangeRetention is how long sync change-log rows are kept. Clients with an
@@ -102,6 +103,7 @@ func newHandler(app core.App, st *store.Store, mounts *storage.Manager) http.Han
 func mount(r *router.Router[*core.RequestEvent], app core.App, dav http.Handler, st *store.Store) {
 	RegisterRoutes(r, dav)
 	account.Register(r, app, st)
+	web.Register(r)
 }
 
 // davUnbind lists PocketBase global middlewares that break DAV clients

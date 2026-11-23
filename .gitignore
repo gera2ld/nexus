@@ -11,3 +11,7 @@ pb_data/
 # secrets
 .env
 .env.*
+
+# the built web app (npm run build in web/)
+/internal/web/dist/*
+!/internal/web/dist/.gitkeep

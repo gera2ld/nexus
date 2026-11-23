@@ -1,6 +1,6 @@
 # Nexus — Web UI design
 
-Status: design, not built · 2026-11-23
+Status: the user dashboard is built (§9 step 1); the rest is design · 2026-11-23
 
 Nexus gets a web app with three parts: a user dashboard, an admin dashboard
 and a file browser with share links. It replaces the current `/account`
@@ -26,9 +26,10 @@ Product scope: [PRODUCT.md](PRODUCT.md) §3.5. Server architecture:
 ## 2. URLs
 
 ```
-/account/                     user dashboard (replaces the /account page)
-/account/passwords            App Passwords
-/account/calendars            calendars and address books
+/account/                     user dashboard: overview (replaces the /account page)
+/account/app-passwords        App Passwords
+/account/calendars            calendars
+/account/contacts             address books
 /account/shares               share links
 /admin/                       admin dashboard: storage accounts and mounts
 /browser/                     302 → /browser/{uid}/ (the signed-in user)
@@ -84,7 +85,12 @@ Product scope: [PRODUCT.md](PRODUCT.md) §3.5. Server architecture:
 - **Share links:** list the user's links with their target, expiry and
   whether they have a password; edit expiry and password; revoke.
 
-API (PocketBase user token; all under `/api/nexus`):
+API (PocketBase user token; all under `/api/nexus`). It is built with
+[Huma](https://huma.rocks), which validates requests from the Go types and
+generates the OpenAPI 3.1 document (`/api/nexus/openapi.json`, checked in
+as `api/openapi.json`). The app's TypeScript types are generated from that
+file, so a server change that breaks the app fails `npm run build`. Errors
+are RFC 9457 problem documents; validation errors are 422.
 
 | Method and path | Does |
 |---|---|
@@ -222,23 +228,26 @@ website is a share of a folder with an `index.html`.
 
 ```
 web/                 the React app (Vite, TypeScript); npm
-web/dist/            build output, embedded; not committed
-internal/web/        go:embed of web/dist, the SPA routes, asset caching
+api/openapi.json     the generated API document the app's types come from
+internal/web/        go:embed of the build (internal/web/dist, not
+                     committed), the SPA routes, asset caching
 internal/account/    /api/nexus user API (grows: calendars, shares, session)
 internal/shares/     the shares collection hooks and /s/ serving
 ```
 
 - **Dockerfile:** a `node` stage on `$BUILDPLATFORM` runs `npm ci && npm
-  run build`; the Go stage copies `web/dist` in before `go build`. The
+  run build`; the Go stage copies `internal/web/dist` in before `go build`. The
   output is plain JavaScript, so no emulation is involved.
 - **Development:** `npm run dev` in `web/` (Vite on :5173, proxying `/api`,
-  `/files` and `/s` to Nexus on :8090). Without a build, the Go binary
+  `/files` and `/dav` to Nexus on :8090). After changing the API, run
+  `UPDATE_OPENAPI=1 go test ./internal/account` to refresh
+  `api/openapi.json`; a test fails while it is stale. Without a build, the Go binary
   serves a placeholder page, so `go test` and `go run` need no Node.
 - **Security headers for the app:** `default-src 'self'`; `script-src
   'self'`; `style-src 'self' 'unsafe-inline'` (Monaco injects styles);
   `worker-src 'self' blob:`; `img-src`, `media-src` and `frame-src` `'self'
   blob:` for previews; `frame-ancestors 'none'`.
-- Hashed assets are cached for a year; `index.html` is `no-cache`.
+- Hashed assets are cached for a year; `index.html` is `no-store`.
 
 ## 8. Testing
 
@@ -257,6 +266,7 @@ internal/shares/     the shares collection hooks and /s/ serving
 Each step is usable on its own; the riskiest comes last.
 
 1. The app shell, sign-in and the user dashboard, replacing `/account`.
+   **Built** (without share links, which come with step 4).
 2. The admin dashboard.
 3. Raw-file changes (§6.3), the Bearer token and cookie on `/files`, and the
    file browser with Monaco.

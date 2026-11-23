@@ -8,7 +8,6 @@ package account
 
 import (
 	"context"
-	_ "embed"
 	"net/http"
 	"sort"
 	"strings"
@@ -33,15 +32,16 @@ const Prefix = "/api/nexus"
 // MaxPasswordsPerUser bounds active App Passwords per account.
 const MaxPasswordsPerUser = 50
 
-//go:embed page.html
-var page string
-
 type ctxKey struct{}
 
 type caller struct {
 	user *core.Record
 	req  *http.Request
 }
+
+// Every array the API returns is a real array, never null, so the web
+// app's types needn't allow null.
+func init() { huma.DefaultArrayNullable = false }
 
 func from(ctx context.Context) caller { c, _ := ctx.Value(ctxKey{}).(caller); return c }
 
@@ -71,15 +71,8 @@ func NewAPI(app core.App, st *store.Store) (huma.API, *http.ServeMux) {
 	return api, mux
 }
 
-// Register mounts the API and the /account page on r.
+// Register mounts the API on r.
 func Register(r *router.Router[*core.RequestEvent], app core.App, st *store.Store) {
-	r.GET("/account", func(e *core.RequestEvent) error {
-		e.Response.Header().Set("Cache-Control", "no-store")
-		e.Response.Header().Set("Content-Security-Policy",
-			"default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'")
-		return e.HTML(http.StatusOK, page)
-	})
-
 	_, mux := NewAPI(app, st)
 	serve := func(e *core.RequestEvent) error {
 		ctx := context.WithValue(e.Request.Context(), ctxKey{}, caller{user: e.Auth, req: e.Request})

@@ -70,7 +70,7 @@ read-only mount and the top level give "Operation not permitted".
 ## Checking a client
 
 1. Set it up with the server address (`https://dav.example.com/`), the
-   email and an App Password. For files, use the address the account page
+   email and an App Password. For files, use the address the dashboard
    shows.
 2. Create, edit and delete something on each side, and sync.
 3. Admin UI → Logs, filtered by `data.meta.user` or `data.meta.appPassword`,

@@ -5,7 +5,17 @@
 #   docker buildx build --platform linux/amd64 -t nexus --load .
 #   docker run -p 8090:8090 -v nexus-data:/pb_data -e NEXUS_ENC_KEY=... nexus
 
-# The build stage always runs on the builder's native platform and Go
+# The web app is plain files, so it's built once on the builder's platform.
+FROM --platform=$BUILDPLATFORM node:lts-alpine AS web
+WORKDIR /src/web
+COPY web/package.json web/package-lock.json ./
+RUN --mount=type=cache,target=/root/.npm npm ci --no-audit --no-fund
+COPY api /src/api
+COPY web ./
+# Writes to /src/internal/web/dist, which the Go build embeds.
+RUN npm run build
+
+# The Go build stage always runs on the builder's native platform and Go
 # cross-compiles for the target; only the short RUN in the final stage runs
 # under emulation when building for another platform.
 FROM --platform=$BUILDPLATFORM golang:1 AS build
@@ -14,6 +24,7 @@ COPY go.mod go.sum ./
 RUN --mount=type=cache,target=/go/pkg/mod go mod download
 COPY cmd ./cmd
 COPY internal ./internal
+COPY --from=web /src/internal/web/dist ./internal/web/dist
 # Pure Go (PocketBase uses a CGo-free SQLite), so the binary is static and
 # cross-compiles. BuildKit supplies TARGETOS/TARGETARCH; declaring them puts
 # them in scope.

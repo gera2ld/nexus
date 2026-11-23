@@ -1,6 +1,11 @@
-# Only go.mod, go.sum, cmd/ and internal/ are needed to build.
+# Only what the two build stages need.
 *
 !go.mod
 !go.sum
 !cmd/
 !internal/
+!api/
+!web/
+web/node_modules
+internal/web/dist/*
+!internal/web/dist/.gitkeep

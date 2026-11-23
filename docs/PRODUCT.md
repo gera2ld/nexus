@@ -103,7 +103,7 @@ Nexus offers a minimal web interface for:
 
 There is no web calendar or contacts app in the initial release.
 
-### 3.5 Web app (designed, not built)
+### 3.5 Web app (user dashboard built; the rest designed)
 
 Full design: [WEB.md](WEB.md).
 
@@ -155,16 +155,17 @@ Full design: [WEB.md](WEB.md).
 | Tasks (VTODO) in v1 | **Yes.** We store raw iCalendar, so tasks cost almost nothing to add. | **Decided** 2026-11-22 |
 | Who owns storage accounts | Only the admin defines storage accounts; users get mounts assigned to them. Users never see or enter storage credentials. | **Decided** 2026-11-22 |
 | Storage backends in v1 | Any rclone backend works underneath. The admin UI offers forms only for S3 and local disk. | Proposed |
-| Where users manage their own App Passwords | A small account page served by Nexus at `/account`. The PocketBase dashboard is for admins only. | **Decided** 2026-11-22 (built) |
+| Where users manage their own App Passwords | The user dashboard served by Nexus at `/account`. The PocketBase dashboard is for admins only. | **Decided** 2026-11-22 (built) |
 
 ## 7. Status
 
 Everything in this document's v1 scope is built: calendars and contacts
-on SQLite, App Passwords and the account page, file mounts on local disk
+on SQLite, App Passwords and the user dashboard, file mounts on local disk
 or S3 through rclone, request logs, backup and restore, and a Docker
 image. Thunderbird, rclone and Finder are checked; DAVx⁵ and Windows
-Explorer are still to check ([CLIENTS.md](CLIENTS.md)). The web app (§3.5)
-is designed but not built.
+Explorer are still to check ([CLIENTS.md](CLIENTS.md)). Of the web app
+(§3.5), the user dashboard is built; the admin dashboard, file browser and
+share links are designed.
 
 **v1 is done when** the Baïkal + rclone + auth-proxy setup can be switched
 off, with Thunderbird and DAVx⁵ syncing both ways through Nexus.

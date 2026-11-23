@@ -128,7 +128,7 @@ didn't block the same client through another; with it, they did.
 4. Files: admin UI → `storage_accounts` (type `local` or `s3`; for S3,
    options such as `{"provider": "AWS", "region": "eu-central-1"}` and the
    keys in `secret_options`), then `mounts` to give a user a folder. Users
-   connect to the address the account page shows,
+   connect to the address the dashboard shows,
    `https://dav.example.com/files/{id}/`, with an App Password that has
    Files access. Local-disk mounts use paths under `/files`.
 
