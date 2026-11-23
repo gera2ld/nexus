@@ -1,5 +1,5 @@
 import * as React from "react";
-import { cn } from "@/lib/utils";
+import { cn } from "cn";
 
 /** A styled native <select>: keyboard and screen-reader behaviour for free. */
 function NativeSelect({ className, ...props }: React.ComponentProps<"select">) {
