@@ -126,6 +126,24 @@ func (a *AppPassword) Wrap(next http.Handler) http.Handler {
 			return
 		}
 
+		if strings.HasPrefix(r.URL.Path, "/files/") {
+			if user, via, tried := a.dashboardUser(r); user != nil {
+				setMeta(ctx, "user", user.Email())
+				setMeta(ctx, "signin", SignInOK)
+				setMeta(ctx, "via", via)
+				next.ServeHTTP(w, r.WithContext(principal.With(ctx, user.Id)))
+				return
+			} else if tried {
+				// An expired or bad dashboard token. No Basic challenge:
+				// it would make the browser ask for a password.
+				setMeta(ctx, "signin", SignInFailed)
+				setMeta(ctx, "via", via)
+				w.Header().Set("WWW-Authenticate", `Bearer realm="nexus"`)
+				http.Error(w, "unauthorized: sign in again", http.StatusUnauthorized)
+				return
+			}
+		}
+
 		email, secret, ok := r.BasicAuth()
 		if !ok {
 			setMeta(ctx, "signin", SignInNone)
@@ -161,6 +179,41 @@ func (a *AppPassword) Wrap(next http.Handler) http.Handler {
 		ctx = WithAllowedPaths(ctx, paths)
 		next.ServeHTTP(w, r.WithContext(principal.With(ctx, user.Id)))
 	})
+}
+
+// SessionCookie carries the dashboard token for raw-file links opened in
+// a new tab, which send no Authorization header (docs/WEB.md §3).
+const SessionCookie = "nexus_session"
+
+// dashboardUser accepts the web app's PocketBase user token on /files: as
+// a Bearer header for any method, or as the session cookie for GET and HEAD
+// only, so a link on another site can't make the browser write. tried is
+// true when a Bearer header was sent but isn't valid; a bad cookie is
+// ignored and the request falls back to Basic auth. A dashboard token has
+// full access to the user's own files, like an App Password with the files
+// scope and no path limit.
+func (a *AppPassword) dashboardUser(r *http.Request) (user *core.Record, via string, tried bool) {
+	if h := r.Header.Get("Authorization"); len(h) > 7 && strings.EqualFold(h[:7], "bearer ") {
+		user = a.tokenUser(strings.TrimSpace(h[7:]))
+		return user, "token", user == nil
+	}
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		return nil, "", false
+	}
+	if c, err := r.Cookie(SessionCookie); err == nil && c.Value != "" {
+		if user = a.tokenUser(c.Value); user != nil {
+			return user, "cookie", false
+		}
+	}
+	return nil, "", false
+}
+
+func (a *AppPassword) tokenUser(token string) *core.Record {
+	rec, err := a.app.FindAuthRecordByToken(token, core.TokenTypeAuth)
+	if err != nil || rec.Collection().Name != schema.Users {
+		return nil
+	}
+	return rec
 }
 
 // check returns the user and App Password record for valid credentials.

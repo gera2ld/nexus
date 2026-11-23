@@ -6,18 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { parentPath, joinPath } from "@/hooks/admin";
-
-function formatSize(n: number) {
-  if (n < 1024) return `${n} B`;
-  const units = ["KB", "MB", "GB", "TB"];
-  let v = n;
-  let u = -1;
-  do {
-    v /= 1024;
-    u++;
-  } while (v >= 1024 && u < units.length - 1);
-  return `${v.toFixed(v < 10 ? 1 : 0)} ${units[u]}`;
-}
+import { formatSize } from "@/lib/format";
 
 /**
  * Lists a storage account's folders. Without onPick it is the connection

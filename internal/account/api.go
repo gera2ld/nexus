@@ -72,6 +72,7 @@ func NewAPI(app core.App, st *store.Store, mgr *storage.Manager) (huma.API, *htt
 	h := &handlers{app: app, st: st}
 	h.registerUser(api)
 	h.registerCollections(api)
+	h.registerSession(api)
 	admin.Register(api, app, mgr)
 	return api, mux
 }

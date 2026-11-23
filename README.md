@@ -11,6 +11,8 @@ them.
 - **App Passwords:** each device gets its own password, limited to
   calendars, contacts or files, and revocable at any time. Users manage
   them on their dashboard.
+- **File browser** at `/browser`: upload, rename, move, copy and delete,
+  previews, and a code editor for text files.
 - **Admin dashboard** at `/admin` for storage accounts (local disk, S3)
   and mounts; users, logs and backups in [PocketBase](https://pocketbase.io)'s
   admin UI.

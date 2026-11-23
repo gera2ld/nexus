@@ -13,8 +13,8 @@ type Problem = components["schemas"]["ErrorModel"];
 
 /**
  * Which PocketBase auth collection this page signs in to: /admin is for
- * superusers, everything else (/ and /account) for users. The two never share a token, and
- * moving between them is a full page load.
+ * superusers, everything else (/, /account and /browser) for users. The
+ * two never share a token, and moving between them is a full page load.
  */
 export const realm: "users" | "_superusers" = location.pathname.startsWith("/admin") ? "_superusers" : "users";
 
@@ -29,10 +29,11 @@ export const token = {
 };
 
 /** Called when the server says the token is no longer good. */
-let onUnauthorized = () => {};
+let unauthorized = () => {};
 export function setUnauthorizedHandler(fn: () => void) {
-  onUnauthorized = fn;
+  unauthorized = fn;
 }
+export const onUnauthorized = () => unauthorized();
 
 const auth: Middleware = {
   onRequest({ request }) {

@@ -3,11 +3,12 @@ import { Badge } from "@/components/ui/badge";
 import { CopyField } from "@/components/CopyField";
 import { Loading, PageHeader } from "@/components/Layout";
 import { useMe } from "@/hooks/queries";
+import { Link } from "react-router";
 
 export function Overview() {
   const me = useMe();
   if (!me.data) return <Loading error={me.error} />;
-  const { server, email, mounts } = me.data;
+  const { id, server, email, mounts } = me.data;
   return (
     <>
       <PageHeader title="Overview" description="What to type into your apps. Every app signs in with your email and an App Password." />
@@ -42,9 +43,11 @@ export function Overview() {
                 <ul className="flex flex-wrap gap-1.5">
                   {mounts.map((m) => (
                     <li key={m.name}>
-                      <Badge variant="secondary">
+                      <Badge variant="secondary" asChild>
+                        <Link to={`/browser/${id}/${encodeURIComponent(m.name)}/`}>
                         {m.name}
                         {m.readOnly && <span className="font-normal text-muted-foreground"> · read-only</span>}
+                        </Link>
                       </Badge>
                     </li>
                   ))}

@@ -51,6 +51,7 @@ the old auth proxy goes away.
 /_/ , /api/*                              PocketBase (admin dashboard, REST API)
 / (GET), /account/*                      user dashboard (the web app's index.html)
 /admin, /admin/*                         admin dashboard (the same app)
+/browser, /browser/*                     file browser (the same app)
 /ui/*                                     the web app's built assets
 /api/nexus/admin/*                        admin dashboard API (PocketBase superuser token)
 /api/nexus/*                              user dashboard API (PocketBase user token)
@@ -66,8 +67,7 @@ the old auth proxy goes away.
 /files/{uid}/{mount}/path/...             WebDAV files
 ```
 
-The file browser and share links will add `/browser/…` and `/s/{token}/…`;
-see [WEB.md](WEB.md).
+Share links will add `/s/{token}/…`; see [WEB.md](WEB.md).
 
 - go-webdav works out what a path is from how deep it is under `/dav`:
   principal, then home set, then collection, then object. That fixes this
@@ -186,6 +186,15 @@ created when a user is created.
 - **DAV and file endpoints** use HTTP Basic: the account email plus an App
   Password. The account's own password is never accepted there; it only works
   for the dashboard and the admin UI.
+- **The web app on `/files`:** the file browser sends its PocketBase user
+  token as `Authorization: Bearer`, which gives full access to the user's
+  own files (like an App Password with the `files` scope and no path limit).
+  A bad or expired token gets a 401 with a `Bearer` challenge, not `Basic`,
+  so browsers don't pop up a password prompt. For raw links opened in a new
+  tab, `POST /api/nexus/session` sets the same token as the `nexus_session`
+  cookie (`HttpOnly`, `SameSite=Lax`, `Path=/files/`, `Secure` over HTTPS,
+  expiring with the token), which `/files` accepts for `GET` and `HEAD`
+  only. Neither works on `/dav`.
 - **Email lookup is case-insensitive.** The `users` email unique index is
   `COLLATE NOCASE`, which PocketBase's `FindAuthRecordByEmail` and its
   password sign-in both honour. It also stops two accounts that differ only
@@ -288,6 +297,17 @@ add about 22 MB to the binary.
   directories; `/files/{uid}/{mount}/…` is the mount. `{uid}` must be the
   signed-in user (403 otherwise), and the App Password needs the `files`
   scope (§6).
+- **Raw files** (`GET`/`HEAD`): `X-Content-Type-Options: nosniff`, text
+  types get `charset=utf-8`, `?download` adds `Content-Disposition:
+  attachment`, and everything but PDF gets `Content-Security-Policy:
+  sandbox`, so an HTML or SVG file displays without running scripts.
+  Chrome's PDF viewer won't run in a sandboxed document, and it runs apart
+  from the page anyway. The image adds Alpine's `mailcap` for the full
+  `/etc/mime.types` table.
+- **Changes made outside Nexus** (on the local disk, or straight in the
+  bucket) show up once the VFS directory cache expires (1 minute; below).
+  Until then their sizes and ETags are the old ones, so `If-Match` can't
+  catch them; changes through Nexus are seen at once.
 - **Backends compiled in:** `local` and `s3` only, registered by blank
   import. Others can be added later by import; `backend/all` would add a lot
   of size for backends nobody here uses.

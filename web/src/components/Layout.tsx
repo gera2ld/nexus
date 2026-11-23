@@ -1,5 +1,5 @@
 import { LogOut, type LucideIcon } from "lucide-react";
-import { Link, NavLink, Outlet } from "react-router";
+import { Link, NavLink, Outlet, useLocation } from "react-router";
 import { avatarURL, type Account } from "@/api/client";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -17,10 +17,12 @@ export type NavItem = { to: string; label: string; icon: LucideIcon; end?: boole
 
 export function Layout({ title, nav, extra }: { title: string; nav: NavItem[]; extra?: React.ReactNode }) {
   const { signOut, account } = useAuth();
+  // The file browser and its editor use the width.
+  const width = useLocation().pathname.startsWith("/browser") ? "max-w-7xl" : "max-w-5xl";
   return (
     <div className="min-h-svh">
       <header className="border-b">
-        <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
+        <div className={cn("mx-auto flex flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3", width)}>
           <span className="font-semibold">{title}</span>
           <nav className="order-last flex w-full flex-wrap gap-1 md:order-none md:w-auto">
             {nav.map(({ to, label, icon: Icon, end }) => (
@@ -46,7 +48,7 @@ export function Layout({ title, nav, extra }: { title: string; nav: NavItem[]; e
           </div>
         </div>
       </header>
-      <main className="mx-auto max-w-5xl px-4 py-6">
+      <main className={cn("mx-auto px-4 py-6", width)}>
         <Outlet />
       </main>
     </div>

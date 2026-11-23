@@ -33,10 +33,11 @@ RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache
     CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -ldflags='-s -w' -o /out/nexus ./cmd/nexus
 
 FROM alpine:3
-# Alpine has CA certificates (for S3 over TLS); add time zone data. The
+# Alpine has CA certificates (for S3 over TLS); add time zone data, and
+# mailcap for /etc/mime.types, the full table Go reads file types from. The
 # data and local-storage folders belong to the nexus user, so named volumes
 # mounted there start out writable.
-RUN apk add --no-cache tzdata \
+RUN apk add --no-cache tzdata mailcap \
  && adduser -D -H -u 65532 nexus \
  && mkdir /pb_data /files \
  && chown nexus:nexus /pb_data /files

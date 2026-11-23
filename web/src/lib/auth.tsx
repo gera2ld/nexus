@@ -1,6 +1,21 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
-import { refresh, setUnauthorizedHandler, signIn as pbSignIn, token, type Account } from "@/api/client";
+import { api, realm, refresh, setUnauthorizedHandler, signIn as pbSignIn, token, type Account } from "@/api/client";
+
+/**
+ * Sets (or clears) the cookie that lets raw file links open in a new tab
+ * (docs/WEB.md §3). Users only; failures just mean raw links ask for a
+ * password, so they're ignored.
+ */
+function syncSession(on: boolean) {
+  if (realm !== "users") return Promise.resolve();
+  // The token is read now: signing out clears it straight after.
+  const headers = { Authorization: `Bearer ${token.get()}` };
+  return (on ? api.POST("/session", { headers }) : api.DELETE("/session", { headers })).then(
+    () => {},
+    () => {},
+  );
+}
 
 type Auth = {
   /** null while checking a stored token on load. */
@@ -19,6 +34,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [account, setAccount] = useState<Account | null>(null);
 
   const signOut = useCallback(() => {
+    // Clearing the cookie needs the token, so it goes first; an expired
+    // token can't clear it, but then the cookie no longer works either.
+    if (token.get()) void syncSession(false);
     token.clear();
     qc.clear();
     setSignedIn(false);
@@ -29,13 +47,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // A stored token may have expired; refreshing checks it and extends it.
     if (token.get())
       refresh().then((a) => {
+        void syncSession(true);
         setAccount(a);
         setSignedIn(true);
       }, signOut);
   }, [signOut]);
 
   const signIn = useCallback(async (email: string, password: string) => {
-    setAccount(await pbSignIn(email, password));
+    const a = await pbSignIn(email, password);
+    void syncSession(true);
+    setAccount(a);
     setSignedIn(true);
   }, []);
 

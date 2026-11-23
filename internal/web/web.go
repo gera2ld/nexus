@@ -1,7 +1,7 @@
 // Package web serves the web app built from web/ (npm run build writes it
-// to dist). Every app path (/, /account/… and /admin) gets index.html and
-// React Router takes over, showing its own "Not found" for unknown pages;
-// /ui/ serves the built assets.
+// to dist). Every app path (/, /account/…, /admin and /browser) gets
+// index.html and React Router takes over, showing its own "Not found" for
+// unknown pages; /ui/ serves the built assets.
 package web
 
 import (
@@ -17,10 +17,13 @@ import (
 //go:embed all:dist
 var dist embed.FS
 
-// csp allows only the app's own scripts and calls. Tailwind and Radix set
-// inline styles, so styles may be inline.
+// csp allows only the app's own scripts and calls. Tailwind, Radix and
+// Monaco set inline styles, so styles may be inline; Monaco runs its
+// language services in workers. Previews load raw files from /files (and
+// blob: URLs) into img, video, audio and iframe elements.
 const csp = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; " +
-	"img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+	"img-src 'self' data: blob:; media-src 'self' blob:; frame-src 'self' blob:; worker-src 'self' blob:; " +
+	"font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
 
 // placeholder is served when the binary was built without the app.
 const placeholder = `<!doctype html><meta charset="utf-8"><title>Nexus</title>
@@ -53,6 +56,8 @@ func Register(r *router.Router[*core.RequestEvent]) {
 	r.GET("/account", serve(http.StatusNotFound))
 	r.GET("/admin", page)
 	r.GET("/admin/{path...}", page)
+	r.GET("/browser", page)
+	r.GET("/browser/{path...}", page)
 
 	assets := http.StripPrefix("/ui/", http.FileServerFS(files))
 	r.GET("/ui/{path...}", func(e *core.RequestEvent) error {

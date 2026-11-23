@@ -2045,6 +2045,67 @@
           "user"
         ]
       }
+    },
+    "/session": {
+      "delete": {
+        "operationId": "delete-session",
+        "responses": {
+          "204": {
+            "description": "No Content",
+            "headers": {
+              "Set-Cookie": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Clear the raw-link cookie (on sign-out)",
+        "tags": [
+          "user"
+        ]
+      },
+      "post": {
+        "description": "The cookie holds this request's token, is limited to /files/, and expires with the token. /files accepts it for GET and HEAD only.",
+        "operationId": "create-session",
+        "responses": {
+          "204": {
+            "description": "No Content",
+            "headers": {
+              "Set-Cookie": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Set the cookie that lets raw file links open in a new tab",
+        "tags": [
+          "user"
+        ]
+      }
     }
   },
   "security": [

@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { CalendarDays, Contact, ExternalLink, HardDrive, House, KeyRound, Users } from "lucide-react";
+import { CalendarDays, Contact, ExternalLink, FolderOpen, HardDrive, House, KeyRound, Users } from "lucide-react";
 import { createBrowserRouter, RouterProvider } from "react-router";
 import { ApiError, realm } from "@/api/client";
 import { Layout, Loading, NotFound, type NavItem } from "@/components/Layout";
@@ -10,6 +10,7 @@ import { AuthProvider, useAuth } from "@/lib/auth";
 import { Mounts } from "@/pages/admin/Mounts";
 import { Storage } from "@/pages/admin/Storage";
 import { AppPasswords } from "@/pages/AppPasswords";
+import { Browser } from "@/pages/browser/Browser";
 import { Collections } from "@/pages/Collections";
 import { Overview } from "@/pages/Overview";
 import { SignIn } from "@/pages/SignIn";
@@ -27,6 +28,7 @@ const queryClient = new QueryClient({
 
 const accountNav: NavItem[] = [
   { to: "/", label: "Overview", icon: House, end: true },
+  { to: "/browser", label: "Files", icon: FolderOpen },
   { to: "/account/app-passwords", label: "App Passwords", icon: KeyRound },
   { to: "/account/calendars", label: "Calendars", icon: CalendarDays },
   { to: "/account/contacts", label: "Contacts", icon: Contact },
@@ -44,7 +46,7 @@ const pocketbaseLink = (
   </a>
 );
 
-// The user pages (/ and /account) and /admin are separate sign-ins (users and superusers), so each
+// The user pages (/, /account and /browser) and /admin are separate sign-ins (users and superusers), so each
 // page load gets only its own routes; moving between them is a page load.
 const router = createBrowserRouter(
   realm === "users"
@@ -58,6 +60,9 @@ const router = createBrowserRouter(
             { path: "account/app-passwords", element: <AppPasswords /> },
             { path: "account/calendars", element: <Collections key="calendars" kind="calendars" /> },
             { path: "account/contacts", element: <Collections key="addressbooks" kind="addressbooks" /> },
+            // /browser shows the mounts too, so there's nothing to redirect.
+            { path: "browser", element: <Browser /> },
+            { path: "browser/:uid/*", element: <Browser /> },
             { path: "*", element: <NotFound home="/" /> },
           ],
         },

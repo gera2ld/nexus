@@ -1,6 +1,6 @@
 # Nexus — Web UI design
 
-Status: the user and admin dashboards are built (§9 steps 1 and 2); the rest is design · 2026-11-23
+Status: the dashboards and the file browser are built (§9 steps 1–3); share links are design · 2026-11-23
 
 Nexus gets a web app with three parts: a user dashboard, an admin dashboard
 and a file browser with share links. It replaces the current `/account`
@@ -33,8 +33,8 @@ Product scope: [PRODUCT.md](PRODUCT.md) §3.5. Server architecture:
 /account/shares               share links
 /admin                        admin dashboard: storage accounts
 /admin/mounts                 mounts
-/browser/                     302 → /browser/{uid}/ (the signed-in user)
-/browser/{uid}/               file browser: the user's mounts
+/browser                      file browser: the signed-in user's mounts
+/browser/{uid}/               the same list
 /browser/{uid}/{mount}/path/  a folder
 /browser/{uid}/{mount}/file   a file, opened in the editor or a preview
 /files/{uid}/{mount}/file     the raw file (WebDAV, unchanged)
@@ -166,10 +166,18 @@ encryption stay in `internal/storage`:
 - **Text files open in Monaco**: any `text/*` type, the usual code and
   config types (JSON, YAML, TOML, XML, JS, …), and anything else whose
   first 8 KB contains no NUL byte. Files over 5 MB open read-only with a
-  warning. The language comes from the file extension.
+  warning; files over 50 MB, or that aren't valid UTF-8, aren't opened
+  (download them instead). The language comes from the file name or
+  extension.
+- Monaco gets syntax highlighting for every language it knows, but not the
+  language services (TypeScript, JSON, CSS, HTML checking and completion):
+  their workers would add several MB for little use in a file editor.
 - **Saving** is a `PUT` with `If-Match` set to the ETag from when the file
   was opened. A 412 means the file changed on the server: the editor offers
-  to reload or overwrite.
+  to reload or overwrite. Changes made outside Nexus are only seen after
+  the VFS directory cache expires (ARCHITECTURE §7), so `If-Match` can't
+  catch those sooner.
+- Unsaved changes ask before leaving the file, in the app or the tab.
 - **Previews:** images, PDF, audio and video use the browser's own viewers,
   loaded from the raw link with the session cookie.
 - Monaco and its workers are a separate bundle loaded on first use, served
@@ -186,7 +194,9 @@ Changes to `GET` and `HEAD` on `/files`:
 - **Sandboxed:** `Content-Security-Policy: sandbox` and
   `X-Content-Type-Options: nosniff`. A raw HTML or SVG file displays, but
   its scripts don't run, so a file can't act with the viewer's session.
-  Running a page's scripts is what share links are for.
+  Running a page's scripts is what share links are for. **PDFs aren't
+  sandboxed:** Chrome's PDF viewer won't run in a sandboxed document, and
+  browsers' PDF viewers run apart from the page anyway.
 - `?download` adds `Content-Disposition: attachment`.
 - `Range` requests work as now.
 
@@ -288,7 +298,7 @@ Each step is usable on its own; the riskiest comes last.
    **Built** (without share links, which come with step 4).
 2. The admin dashboard. **Built.**
 3. Raw-file changes (§6.3), the Bearer token and cookie on `/files`, and the
-   file browser with Monaco.
+   file browser with Monaco. **Built.**
 4. Share links.
 
 ## 10. Open questions

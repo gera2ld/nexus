@@ -323,3 +323,94 @@ func TestFilesCrossMountMove(t *testing.T) {
 		t.Errorf("same-mount MOVE: %d", r.code)
 	}
 }
+
+// TestFilesDashboardToken: the web app's token works on /files as a Bearer
+// header for every method and as the session cookie for reads only.
+func TestFilesDashboardToken(t *testing.T) {
+	f := newFilesEnv(t)
+	tok := func(r *http.Request) { r.Header.Set("Authorization", "Bearer "+f.userTok) }
+	os.WriteFile(filepath.Join(f.docs, "a.txt"), []byte("hello"), 0o644)
+
+	if r := f.do("PROPFIND", f.base+"/docs/", nil, tok); r.code != http.StatusMultiStatus {
+		t.Errorf("PROPFIND with the token: %d", r.code)
+	}
+	if r := f.do("PUT", f.base+"/docs/b.txt", "new", tok); r.code != http.StatusCreated {
+		t.Errorf("PUT with the token: %d %s", r.code, r.body)
+	}
+	if r := f.do("PUT", f.base+"/archive/b.txt", "new", tok); r.code != http.StatusForbidden {
+		t.Errorf("PUT to a read-only mount with the token: %d", r.code)
+	}
+	bad := func(r *http.Request) { r.Header.Set("Authorization", "Bearer nope") }
+	if r := f.do("GET", f.base+"/docs/a.txt", nil, bad); r.code != http.StatusUnauthorized ||
+		!strings.HasPrefix(r.hdr.Get("WWW-Authenticate"), "Bearer") {
+		t.Errorf("bad token: %d %q (a Basic challenge would make browsers ask for a password)", r.code, r.hdr.Get("WWW-Authenticate"))
+	}
+	_, bobTok := f.user("bob@example.com")
+	if r := f.do("GET", f.base+"/docs/a.txt", nil, func(r *http.Request) { r.Header.Set("Authorization", "Bearer "+bobTok) }); r.code != http.StatusForbidden {
+		t.Errorf("another user's token: %d, want 403", r.code)
+	}
+	if r := f.do("PROPFIND", "/dav/"+f.uid+"/", nil, tok); r.code != http.StatusUnauthorized {
+		t.Errorf("the token on /dav: %d, want 401", r.code)
+	}
+
+	// The session cookie comes from the API and works for GET and HEAD.
+	r := f.do("POST", "/api/nexus/session", nil, bearer(f.userTok))
+	var cookie *http.Cookie
+	for _, c := range (&http.Response{Header: r.hdr}).Cookies() {
+		if c.Name == "nexus_session" {
+			cookie = c
+		}
+	}
+	if r.code != http.StatusNoContent || cookie == nil || cookie.Value != f.userTok || !cookie.HttpOnly ||
+		cookie.Path != "/files/" || cookie.SameSite != http.SameSiteLaxMode || cookie.Expires.IsZero() {
+		t.Fatalf("POST /session: %d %v", r.code, r.hdr["Set-Cookie"])
+	}
+	withCookie := func(r *http.Request) { r.AddCookie(cookie) }
+	for _, m := range []string{"GET", "HEAD"} {
+		if r := f.do(m, f.base+"/docs/a.txt", nil, withCookie); r.code != http.StatusOK {
+			t.Errorf("%s with the cookie: %d", m, r.code)
+		}
+	}
+	for _, m := range []string{"PUT", "DELETE", "PROPFIND", "MKCOL"} {
+		if r := f.do(m, f.base+"/docs/c.txt", nil, withCookie); r.code != http.StatusUnauthorized {
+			t.Errorf("%s with only the cookie: %d, want 401", m, r.code)
+		}
+	}
+	if r := f.do("DELETE", "/api/nexus/session", nil, bearer(f.userTok)); r.code != http.StatusNoContent ||
+		!strings.Contains(r.hdr.Get("Set-Cookie"), "nexus_session=;") || !strings.Contains(r.hdr.Get("Set-Cookie"), "Max-Age=0") {
+		t.Errorf("DELETE /session: %d %q", r.code, r.hdr.Get("Set-Cookie"))
+	}
+	if r := f.do("POST", "/api/nexus/session", nil, nil); r.code != http.StatusUnauthorized {
+		t.Errorf("POST /session signed out: %d", r.code)
+	}
+}
+
+// TestFilesRawHeaders: raw files display sandboxed, text is UTF-8, and
+// ?download makes a download.
+func TestFilesRawHeaders(t *testing.T) {
+	f := newFilesEnv(t)
+	os.WriteFile(filepath.Join(f.docs, "page.html"), []byte("<script>alert(1)</script>"), 0o644)
+	os.WriteFile(filepath.Join(f.docs, "notes.md"), []byte("# hi"), 0o644)
+	os.WriteFile(filepath.Join(f.docs, "café.png"), []byte("not really"), 0o644)
+	os.WriteFile(filepath.Join(f.docs, "a.pdf"), []byte("%PDF-1.4"), 0o644)
+
+	r := f.req("GET", "/docs/page.html", "")
+	if r.code != http.StatusOK || r.hdr.Get("Content-Security-Policy") != "sandbox" ||
+		r.hdr.Get("X-Content-Type-Options") != "nosniff" || r.hdr.Get("Content-Type") != "text/html; charset=utf-8" ||
+		r.hdr.Get("Content-Disposition") != "" {
+		t.Errorf("page.html: %d %v", r.code, r.hdr)
+	}
+	if r := f.req("HEAD", "/docs/page.html", ""); r.hdr.Get("Content-Security-Policy") != "sandbox" {
+		t.Errorf("HEAD: %v", r.hdr)
+	}
+	if r := f.req("GET", "/docs/caf%C3%A9.png?download", ""); r.hdr.Get("Content-Type") != "image/png" ||
+		r.hdr.Get("Content-Disposition") != "attachment; filename*=utf-8''caf%C3%A9.png" {
+		t.Errorf("?download: %v", r.hdr)
+	}
+	if r := f.req("GET", "/docs/a.pdf", ""); r.hdr.Get("Content-Type") != "application/pdf" || r.hdr.Get("Content-Security-Policy") != "" {
+		t.Errorf("PDF (Chrome's viewer won't run sandboxed): %v", r.hdr)
+	}
+	if r := f.req("GET", "/docs/notes.md", "", "Range", "bytes=0-1"); r.code != http.StatusPartialContent || r.body != "# " {
+		t.Errorf("Range: %d %q", r.code, r.body)
+	}
+}
