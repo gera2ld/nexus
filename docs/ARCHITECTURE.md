@@ -63,6 +63,9 @@ the old auth proxy goes away.
 /files/{uid}/{mount}/path/...             WebDAV files
 ```
 
+The web app adds `/account/…`, `/admin/…`, `/browser/…` and share links at
+`/s/{token}/…`; see [WEB.md](WEB.md) (designed, not built).
+
 - go-webdav works out what a path is from how deep it is under `/dav`:
   principal, then home set, then collection, then object. That fixes this
   shape. The DAV router sends `/dav/{uid}/` to `webdav.ServePrincipal`,
@@ -425,6 +428,9 @@ internal/files/  /files WebDAV: per-user view of mounts over x/net/webdav, write
 internal/principal/ authenticated user id in the request context
 scripts/probe.sh end-to-end check of a running server (curl)
 ```
+
+The web app adds `web/`, `internal/web/` and `internal/shares/`
+([WEB.md](WEB.md) §7).
 
 ## 11. Open technical questions
 

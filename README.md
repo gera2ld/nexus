@@ -61,4 +61,5 @@ go run ./cmd/nexus serve                         # http://127.0.0.1:8090/_/
 
 - [Product design](docs/PRODUCT.md)
 - [Architecture](docs/ARCHITECTURE.md)
+- [Web app design](docs/WEB.md)
 - [Vendored DAV library notes](internal/dav/UPSTREAM.md)

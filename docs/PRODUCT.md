@@ -1,19 +1,21 @@
 # Nexus — Product Design
 
-Status: draft · Last updated 2026-11-22 · Supersedes the Notion page
+Status: draft · Last updated 2026-11-23 · Supersedes the Notion page
 "Nexus — Personal DAV Server".
 
 How it's built: [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## 1. What Nexus is
 
-Nexus is a lightweight, self-hosted personal DAV server. It serves
-**CalDAV, CardDAV and plain WebDAV files** from one service, with one set of
-users and one authentication system.
+Nexus is a self-hosted personal server for calendars, contacts and files. It
+serves **CalDAV, CardDAV and plain WebDAV files** from one service, with one
+set of users and one authentication system, plus a web app for managing it
+and for working with files.
 
-It is built for existing clients, not as a web app. Users read and edit their
-calendars, contacts and files in the apps they already use. Nexus's own web UI
-covers only administration.
+Calendars and contacts are read and edited in the apps people already use;
+the web app only manages them. Files work both ways: in WebDAV clients, and
+in the web app's file browser and editor, with share links for anything
+that should be public.
 
 ### Who it's for
 
@@ -33,14 +35,15 @@ disagree, the client wins, as long as the spec still allows what we do.
 
 ## 2. Goals
 
-1. **Replace three services with one.** The current setup is Baïkal (CalDAV and
-   CardDAV), rclone's WebDAV server (files) and a separate auth proxy. Nexus
-   replaces all three.
+1. **Replace four services with one.** The current setup is Baïkal (CalDAV and
+   CardDAV), rclone's WebDAV server (files), a separate auth proxy and
+   FileStash (web file browser). Nexus replaces all four.
 2. **Stay standards-compatible and client-focused.** Implement what the target
    clients actually use, correctly, rather than every optional RFC feature.
 3. **Reuse rclone's storage backends**, S3 first, instead of writing our own
    cloud storage drivers.
-4. **Keep the web UI minimal.** The clients provide the main user experience.
+4. **A focused web app:** user and admin dashboards, a file browser and
+   share links. No web calendar or contacts app; client apps do that best.
 5. **Keep it simple to run:** one Docker container, one database file and one
    config.
 
@@ -100,11 +103,32 @@ Nexus offers a minimal web interface for:
 
 There is no web calendar or contacts app in the initial release.
 
+### 3.5 Web app (designed, not built)
+
+Full design: [WEB.md](WEB.md).
+
+- **User dashboard** (replaces `/account`): App Passwords with editable
+  name, scopes and paths; calendars and address books (create, rename,
+  recolour, delete); the user's share links.
+- **Admin dashboard:** storage accounts with proper forms for local disk
+  and S3 and a connection test; mounts per user. Users, logs and backups
+  stay in the PocketBase admin UI.
+- **File browser** at `/browser/…`, mirroring the raw `/files/…` paths: a
+  file tree, uploads, rename, move, copy and delete, previews, and every
+  text file in a code editor (Monaco) with conflict detection on save.
+- **Raw links** (`/files/…`) open in a browser tab with the right content
+  type. They're sandboxed, so an HTML file's scripts don't run there.
+- **Share links** (`/s/{token}/…`) for a file or a folder, public or with a
+  password, optionally expiring. A shared folder with an `index.html` is a
+  published website; its relative paths are its author's job.
+- Not yet: thumbnails, search, large-file and folder uploads.
+
 ## 4. Out of scope for the initial release
 
 - Mail: no SMTP or IMAP.
 - A rich web UI for calendars or contacts.
-- Team collaboration, complex permissions (ACLs) and public sharing.
+- Team collaboration and complex permissions (ACLs). Share links (§3.5)
+  are the only way to give others access.
 - Groupware: meeting invitations, scheduling (iTIP/iMIP), free-busy and
   notifications.
 - Incremental sync of file trees, unless client testing shows a need.
@@ -139,7 +163,8 @@ Everything in this document's v1 scope is built: calendars and contacts
 on SQLite, App Passwords and the account page, file mounts on local disk
 or S3 through rclone, request logs, backup and restore, and a Docker
 image. Thunderbird, rclone and Finder are checked; DAVx⁵ and Windows
-Explorer are still to check ([CLIENTS.md](CLIENTS.md)).
+Explorer are still to check ([CLIENTS.md](CLIENTS.md)). The web app (§3.5)
+is designed but not built.
 
 **v1 is done when** the Baïkal + rclone + auth-proxy setup can be switched
 off, with Thunderbird and DAVx⁵ syncing both ways through Nexus.
