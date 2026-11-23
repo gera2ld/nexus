@@ -1,7 +1,7 @@
-import { Plus } from "lucide-react";
+import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { api, unwrap, type Collection } from "@/api/client";
-import { Confirm } from "@/components/Confirm";
+import { ConfirmPopover } from "@/components/ConfirmPopover";
 import { CopyField } from "@/components/CopyField";
 import { Loading, PageHeader } from "@/components/Layout";
 import { Badge } from "@/components/ui/badge";
@@ -63,7 +63,6 @@ export function Collections({ kind }: { kind: Kind }) {
   const list = useCollections(kind);
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<Collection | null>(null);
-  const [deleting, setDeleting] = useState<Collection | null>(null);
 
   const create = useAction((v: Values) => calls.create(kind, v), [kind], `${cap(t.noun)} created`);
   const update = useAction(({ slug, v }: { slug: string; v: Values }) => calls.update(kind, slug, v), [kind], "Saved");
@@ -83,35 +82,46 @@ export function Collections({ kind }: { kind: Kind }) {
         <div className="grid gap-3">
           {list.data.map((c) => (
             <Card key={c.slug} className="py-4">
-              <CardContent className="flex flex-wrap items-start gap-x-4 gap-y-2">
-                {kind === "calendars" && (
-                  <span
-                    aria-hidden
-                    className="mt-1.5 size-3 shrink-0 rounded-full border"
-                    style={c.color ? { background: c.color.slice(0, 7), borderColor: "transparent" } : undefined}
-                  />
-                )}
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-baseline gap-x-2">
-                    <span className="font-medium">{c.name || c.slug}</span>
-                    <span className="text-sm text-muted-foreground">{t.items(c.items, c.components)}</span>
-                    {c.components?.length === 1 && (
-                      <Badge variant="secondary">{c.components[0] === "VEVENT" ? "Events only" : "Tasks only"}</Badge>
-                    )}
+              <CardContent className="grid gap-3">
+                <div className="flex items-start gap-3">
+                  {kind === "calendars" && (
+                    <span
+                      aria-hidden
+                      className="mt-1.5 size-3 shrink-0 rounded-full border"
+                      style={c.color ? { background: c.color.slice(0, 7), borderColor: "transparent" } : undefined}
+                    />
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-baseline gap-x-2">
+                      <span className="font-medium break-words">{c.name || c.slug}</span>
+                      <span className="text-sm text-muted-foreground">{t.items(c.items, c.components)}</span>
+                      {c.components?.length === 1 && (
+                        <Badge variant="secondary">{c.components[0] === "VEVENT" ? "Events only" : "Tasks only"}</Badge>
+                      )}
+                    </div>
+                    {c.description && <p className="mt-0.5 text-sm text-muted-foreground">{c.description}</p>}
                   </div>
-                  {c.description && <p className="mt-0.5 text-sm text-muted-foreground">{c.description}</p>}
-                  <div className="mt-2">
-                    <CopyField value={c.url} label="Address" />
+                  <div className="-my-1 -mr-2 flex shrink-0">
+                    <Button variant="ghost" size="icon-sm" aria-label={`Edit ${c.name || c.slug}`} onClick={() => setEditing(c)}>
+                      <Pencil />
+                    </Button>
+                    <ConfirmPopover
+                      title={`Delete ${c.name || c.slug}?`}
+                      description={
+                        c.items
+                          ? `This deletes the ${t.noun} and the ${t.items(c.items, c.components)} in it, on the server and in every app that syncs it. It can't be undone.`
+                          : `The ${t.noun} is empty. It goes from the server and from every app that syncs it.`
+                      }
+                      action="Delete"
+                      onConfirm={() => remove.mutate(c.slug)}
+                    >
+                      <Button variant="ghost" size="icon-sm" className="text-destructive" aria-label={`Delete ${c.name || c.slug}`}>
+                        <Trash2 />
+                      </Button>
+                    </ConfirmPopover>
                   </div>
                 </div>
-                <div className="flex gap-1">
-                  <Button variant="ghost" size="sm" onClick={() => setEditing(c)}>
-                    Edit
-                  </Button>
-                  <Button variant="ghost" size="sm" className="text-destructive" onClick={() => setDeleting(c)}>
-                    Delete
-                  </Button>
-                </div>
+                <CopyField value={c.url} label="Address" block />
               </CardContent>
             </Card>
           ))}
@@ -148,18 +158,6 @@ export function Collections({ kind }: { kind: Kind }) {
           onSubmit={(v) => update.mutate({ slug: editing.slug, v }, { onSuccess: () => setEditing(null) })}
         />
       )}
-      <Confirm
-        open={!!deleting}
-        onOpenChange={(o) => !o && setDeleting(null)}
-        title={`Delete ${deleting?.name || deleting?.slug}?`}
-        description={
-          deleting?.items
-            ? `This deletes the ${t.noun} and the ${t.items(deleting.items, deleting.components)} in it, on the server and in every app that syncs it. It can't be undone.`
-            : `The ${t.noun} is empty. It goes from the server and from every app that syncs it.`
-        }
-        action="Delete"
-        onConfirm={() => deleting && remove.mutate(deleting.slug)}
-      />
     </>
   );
 }
