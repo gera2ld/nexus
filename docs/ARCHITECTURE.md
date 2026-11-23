@@ -302,9 +302,8 @@ add about 22 MB to the binary.
   signed-in user (403 otherwise), and the App Password needs the `files`
   scope (§6).
 - **Raw files** (`GET`/`HEAD`): `X-Content-Type-Options: nosniff`, text
-  types get `charset=utf-8`, `?download` adds `Content-Disposition:
-  attachment`, and everything but PDF gets `Content-Security-Policy:
-  sandbox`, so an HTML or SVG file displays without running scripts.
+  types get `charset=utf-8`, and everything but PDF gets
+  `Content-Security-Policy: sandbox`, so an HTML or SVG file displays without running scripts.
   Chrome's PDF viewer won't run in a sandboxed document, and it runs apart
   from the page anyway. The image adds Alpine's `mailcap` for the full
   `/etc/mime.types` table.

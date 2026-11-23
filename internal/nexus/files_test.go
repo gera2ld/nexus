@@ -390,13 +390,11 @@ func TestFilesDashboardToken(t *testing.T) {
 	}
 }
 
-// TestFilesRawHeaders: raw files display sandboxed, text is UTF-8, and
-// ?download makes a download.
+// TestFilesRawHeaders: raw files display sandboxed and text is UTF-8.
 func TestFilesRawHeaders(t *testing.T) {
 	f := newFilesEnv(t)
 	os.WriteFile(filepath.Join(f.docs, "page.html"), []byte("<script>alert(1)</script>"), 0o644)
 	os.WriteFile(filepath.Join(f.docs, "notes.md"), []byte("# hi"), 0o644)
-	os.WriteFile(filepath.Join(f.docs, "café.png"), []byte("not really"), 0o644)
 	os.WriteFile(filepath.Join(f.docs, "a.pdf"), []byte("%PDF-1.4"), 0o644)
 
 	r := f.req("GET", "/docs/page.html", "")
@@ -407,10 +405,6 @@ func TestFilesRawHeaders(t *testing.T) {
 	}
 	if r := f.req("HEAD", "/docs/page.html", ""); r.hdr.Get("Content-Security-Policy") != "sandbox" {
 		t.Errorf("HEAD: %v", r.hdr)
-	}
-	if r := f.req("GET", "/docs/caf%C3%A9.png?download", ""); r.hdr.Get("Content-Type") != "image/png" ||
-		r.hdr.Get("Content-Disposition") != "attachment; filename*=utf-8''caf%C3%A9.png" {
-		t.Errorf("?download: %v", r.hdr)
 	}
 	if r := f.req("GET", "/docs/a.pdf", ""); r.hdr.Get("Content-Type") != "application/pdf" || r.hdr.Get("Content-Security-Policy") != "" {
 		t.Errorf("PDF (Chrome's viewer won't run sandboxed): %v", r.hdr)

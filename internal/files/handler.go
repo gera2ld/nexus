@@ -12,7 +12,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"path"
 	"strconv"
 	"strings"
 	"sync"
@@ -144,7 +143,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.Method == "GET" || r.Method == "HEAD" {
-		w = rawHeaders(w, r, target)
+		w = rawHeaders(w)
 	}
 	if r.Method == "PUT" && existed {
 		// x/net/webdav answers 201 even when it replaced a file.
@@ -265,15 +264,9 @@ func (o *overwriteWriter) Unwrap() http.ResponseWriter { return o.ResponseWriter
 
 // rawHeaders sets the headers of a raw file (docs/WEB.md §6.3). The file
 // displays but can't run scripts with the viewer's session: a page's
-// scripts run only through a share link. ?download makes it a download.
-func rawHeaders(w http.ResponseWriter, r *http.Request, target string) http.ResponseWriter {
-	h := w.Header()
-	h.Set("X-Content-Type-Options", "nosniff")
-	if _, ok := r.URL.Query()["download"]; ok {
-		if name := path.Base(target); name != "/" && name != "." {
-			h.Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": name}))
-		}
-	}
+// scripts run only through a share link.
+func rawHeaders(w http.ResponseWriter) http.ResponseWriter {
+	w.Header().Set("X-Content-Type-Options", "nosniff")
 	return &charsetWriter{ResponseWriter: w}
 }
 

@@ -168,7 +168,7 @@ encryption stay in `internal/storage`:
   config types (JSON, YAML, TOML, XML, JS, …), and anything else whose
   first 8 KB contains no NUL byte. Files over 5 MB open read-only with a
   warning; files over 50 MB, or that aren't valid UTF-8, aren't opened
-  (download them instead). The language comes from the file name or
+  (open them with Raw instead). The language comes from the file name or
   extension.
 - Monaco gets syntax highlighting for every language it knows, but not the
   language services (TypeScript, JSON, CSS, HTML checking and completion):
@@ -198,7 +198,6 @@ Changes to `GET` and `HEAD` on `/dav/files`:
   Running a page's scripts is what share links are for. **PDFs aren't
   sandboxed:** Chrome's PDF viewer won't run in a sandboxed document, and
   browsers' PDF viewers run apart from the page anyway.
-- `?download` adds `Content-Disposition: attachment`.
 - `Range` requests work as now.
 
 ### 6.4 Share links
