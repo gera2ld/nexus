@@ -51,6 +51,17 @@ func NewHTTPError(statusCode int, cause error) error {
 	return &internal.HTTPError{Code: statusCode, Err: cause}
 }
 
+// HTTPErrorStatus returns the status code and message of an error made with
+// NewHTTPError, or 500 and the error text for any other error. Nexus
+// addition, so non-DAV APIs can reuse the store.
+func HTTPErrorStatus(err error) (int, string) {
+	h := internal.HTTPErrorFromError(err)
+	if h.Err == nil {
+		return h.Code, http.StatusText(h.Code)
+	}
+	return h.Code, h.Err.Error()
+}
+
 type backend struct {
 	FileSystem FileSystem
 }

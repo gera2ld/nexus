@@ -36,7 +36,8 @@ func serverAt(t *testing.T, dir string) *server {
 	mounts := storage.NewManager(app, sealer)
 	mounts.Bind(app)
 	t.Cleanup(mounts.Close)
-	mount(r, newHandler(app, store.New(app), mounts))
+	st := store.New(app)
+	mount(r, app, newHandler(app, st, mounts), st)
 	if s.mux, err = r.BuildMux(); err != nil {
 		t.Fatal(err)
 	}

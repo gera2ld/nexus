@@ -75,7 +75,7 @@ func Setup(app core.App) error {
 	})
 
 	app.OnServe().BindFunc(func(se *core.ServeEvent) error {
-		mount(se.Router, dav)
+		mount(se.Router, app, dav, st)
 		return se.Next()
 	})
 	return nil
@@ -99,9 +99,9 @@ func newHandler(app core.App, st *store.Store, mounts *storage.Manager) http.Han
 }
 
 // mount registers every Nexus route.
-func mount(r *router.Router[*core.RequestEvent], dav http.Handler) {
+func mount(r *router.Router[*core.RequestEvent], app core.App, dav http.Handler, st *store.Store) {
 	RegisterRoutes(r, dav)
-	account.Register(r)
+	account.Register(r, app, st)
 }
 
 // davUnbind lists PocketBase global middlewares that break DAV clients

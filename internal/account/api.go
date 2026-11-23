@@ -1,10 +1,13 @@
-// Package account serves the user's account page and the small API it uses
-// to create and revoke App Passwords. These routes use PocketBase's own user
-// auth (a token from auth-with-password); app_passwords itself stays
-// superuser-only, so secret hashes never leave the server.
+// Package account serves the user dashboard's API at /api/nexus: the
+// signed-in user, App Passwords, calendars and address books. It is built
+// with Huma, which also generates the OpenAPI document the web app's types
+// come from (api/openapi.json). Requests use PocketBase's own user auth (a
+// token from auth-with-password); app_passwords itself stays superuser-only,
+// so secret hashes never leave the server.
 package account
 
 import (
+	"context"
 	_ "embed"
 	"net/http"
 	"sort"
@@ -16,10 +19,16 @@ import (
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/router"
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/types"
+	"github.com/danielgtaylor/huma/v2"
+	"github.com/danielgtaylor/huma/v2/adapters/humago"
 
 	"nexus/internal/auth"
 	"nexus/internal/schema"
+	"nexus/internal/store"
 )
+
+// Prefix is where the API is mounted.
+const Prefix = "/api/nexus"
 
 // MaxPasswordsPerUser bounds active App Passwords per account.
 const MaxPasswordsPerUser = 50
@@ -27,33 +36,43 @@ const MaxPasswordsPerUser = 50
 //go:embed page.html
 var page string
 
-// AppPasswordView is what the API returns; never the hash.
-type AppPasswordView struct {
-	ID         string   `json:"id"`
-	Label      string   `json:"label"`
-	Scopes     []string `json:"scopes"`
-	Paths      []string `json:"paths"`
-	Created    string   `json:"created"`
-	LastUsedAt string   `json:"lastUsedAt"`
-	RevokedAt  string   `json:"revokedAt"`
-	// Secret is set only in the create response.
-	Secret string `json:"secret,omitempty"`
+type ctxKey struct{}
+
+type caller struct {
+	user *core.Record
+	req  *http.Request
 }
 
-func view(r *core.Record) AppPasswordView {
-	return AppPasswordView{
-		ID:         r.Id,
-		Label:      r.GetString("label"),
-		Scopes:     r.GetStringSlice("scopes"),
-		Paths:      r.GetStringSlice("paths"),
-		Created:    r.GetString("created"),
-		LastUsedAt: r.GetString("last_used_at"),
-		RevokedAt:  r.GetString("revoked_at"),
+func from(ctx context.Context) caller { c, _ := ctx.Value(ctxKey{}).(caller); return c }
+
+// handlers holds what the operations need.
+type handlers struct {
+	app core.App
+	st  *store.Store
+}
+
+// NewAPI builds the Huma API. The returned handler serves every path under
+// Prefix and expects the signed-in user from serve.
+func NewAPI(app core.App, st *store.Store) (huma.API, *http.ServeMux) {
+	mux := http.NewServeMux()
+	cfg := huma.DefaultConfig("Nexus API", "1")
+	cfg.Info.Description = "The user dashboard's API. Sign in with PocketBase " +
+		"(users auth-with-password) and send the token as a Bearer header."
+	cfg.DocsPath = "" // no docs UI: it would load scripts from a CDN
+	cfg.Servers = []*huma.Server{{URL: Prefix}}
+	cfg.Components.SecuritySchemes = map[string]*huma.SecurityScheme{
+		"bearer": {Type: "http", Scheme: "bearer", Description: "PocketBase user token"},
 	}
+	cfg.Security = []map[string][]string{{"bearer": {}}}
+	api := humago.NewWithPrefix(mux, Prefix, cfg)
+	h := &handlers{app: app, st: st}
+	h.registerUser(api)
+	h.registerCollections(api)
+	return api, mux
 }
 
-// Register mounts /account and /api/nexus/* on r.
-func Register(r *router.Router[*core.RequestEvent]) {
+// Register mounts the API and the /account page on r.
+func Register(r *router.Router[*core.RequestEvent], app core.App, st *store.Store) {
 	r.GET("/account", func(e *core.RequestEvent) error {
 		e.Response.Header().Set("Cache-Control", "no-store")
 		e.Response.Header().Set("Content-Security-Policy",
@@ -61,135 +80,241 @@ func Register(r *router.Router[*core.RequestEvent]) {
 		return e.HTML(http.StatusOK, page)
 	})
 
-	g := r.Group("/api/nexus")
-	g.Bind(apis.RequireAuth(schema.Users))
-	g.GET("/me", me)
-	g.GET("/app-passwords", list)
-	g.POST("/app-passwords", create)
-	g.POST("/app-passwords/{id}/revoke", revoke)
+	_, mux := NewAPI(app, st)
+	serve := func(e *core.RequestEvent) error {
+		ctx := context.WithValue(e.Request.Context(), ctxKey{}, caller{user: e.Auth, req: e.Request})
+		mux.ServeHTTP(e.Response, e.Request.WithContext(ctx))
+		return nil
+	}
+	// The OpenAPI document is public; everything else needs a user.
+	r.GET(Prefix+"/openapi.json", serve)
+	r.GET(Prefix+"/openapi.yaml", serve)
+	r.GET(Prefix+"/schemas/{path...}", serve)
+	r.Any(Prefix+"/{path...}", serve).Bind(apis.RequireAuth(schema.Users))
 }
 
-func me(e *core.RequestEvent) error {
-	recs, err := e.App.FindRecordsByFilter(schema.Mounts, "user = {:u}", "name", 0, 0, dbx.Params{"u": e.Auth.Id})
+// ---- the signed-in user ----
+
+type Mount struct {
+	Name     string `json:"name"`
+	ReadOnly bool   `json:"readOnly"`
+}
+
+type Me struct {
+	ID     string  `json:"id"`
+	Email  string  `json:"email"`
+	Server string  `json:"server" doc:"Origin clients should use, e.g. https://dav.example.com"`
+	Mounts []Mount `json:"mounts"`
+}
+
+// AppPassword is what the API returns; never the hash.
+type AppPassword struct {
+	ID         string   `json:"id"`
+	Label      string   `json:"label"`
+	Scopes     []string `json:"scopes" enum:"cal,card,files"`
+	Paths      []string `json:"paths" doc:"Path limits; empty means none"`
+	Created    string   `json:"created"`
+	LastUsedAt string   `json:"lastUsedAt"`
+	RevokedAt  string   `json:"revokedAt"`
+	// Secret is set only in the create response.
+	Secret string `json:"secret,omitempty" doc:"Only in the create response; shown once"`
+}
+
+func view(r *core.Record) AppPassword {
+	return AppPassword{
+		ID:         r.Id,
+		Label:      r.GetString("label"),
+		Scopes:     nonNil(r.GetStringSlice("scopes")),
+		Paths:      nonNil(r.GetStringSlice("paths")),
+		Created:    r.GetString("created"),
+		LastUsedAt: r.GetString("last_used_at"),
+		RevokedAt:  r.GetString("revoked_at"),
+	}
+}
+
+func nonNil(s []string) []string {
+	if s == nil {
+		return []string{}
+	}
+	return s
+}
+
+type body[T any] struct{ Body T }
+
+type idPath struct {
+	ID string `path:"id"`
+}
+
+type createPasswordInput struct {
+	Body struct {
+		Label  string   `json:"label" minLength:"1" maxLength:"100"`
+		Scopes []string `json:"scopes" minItems:"1" enum:"cal,card,files"`
+		Paths  []string `json:"paths,omitempty" doc:"Optional path limits, e.g. /dav/calendars/personal/ or /files/docs/"`
+	}
+}
+
+type updatePasswordInput struct {
+	ID   string `path:"id"`
+	Body struct {
+		Label  *string   `json:"label,omitempty" minLength:"1" maxLength:"100"`
+		Scopes []string  `json:"scopes,omitempty" minItems:"1" enum:"cal,card,files"`
+		Paths  *[]string `json:"paths,omitempty" doc:"Omit to keep; [] removes the limit"`
+	}
+}
+
+func (h *handlers) registerUser(api huma.API) {
+	huma.Register(api, huma.Operation{
+		OperationID: "get-me", Method: http.MethodGet, Path: "/me", Tags: []string{"user"},
+		Summary: "The signed-in user, the server address and their mounts",
+	}, h.me)
+	huma.Register(api, huma.Operation{
+		OperationID: "list-app-passwords", Method: http.MethodGet, Path: "/app-passwords", Tags: []string{"app passwords"},
+		Summary: "List App Passwords, newest first, including revoked ones",
+	}, h.listPasswords)
+	huma.Register(api, huma.Operation{
+		OperationID: "create-app-password", Method: http.MethodPost, Path: "/app-passwords", Tags: []string{"app passwords"},
+		Summary: "Create an App Password; the secret is in this response only", DefaultStatus: http.StatusCreated,
+	}, h.createPassword)
+	huma.Register(api, huma.Operation{
+		OperationID: "update-app-password", Method: http.MethodPatch, Path: "/app-passwords/{id}", Tags: []string{"app passwords"},
+		Summary: "Change an App Password's label, scopes or paths; the secret stays the same",
+	}, h.updatePassword)
+	huma.Register(api, huma.Operation{
+		OperationID: "revoke-app-password", Method: http.MethodPost, Path: "/app-passwords/{id}/revoke", Tags: []string{"app passwords"},
+		Summary: "Revoke an App Password; it stops working at once",
+	}, h.revokePassword)
+}
+
+func (h *handlers) me(ctx context.Context, _ *struct{}) (*body[Me], error) {
+	c := from(ctx)
+	recs, err := h.app.FindRecordsByFilter(schema.Mounts, "user = {:u}", "name", 0, 0, dbx.Params{"u": c.user.Id})
 	if err != nil {
-		return e.InternalServerError("", err)
+		return nil, err
 	}
-	type mount struct {
-		Name     string `json:"name"`
-		ReadOnly bool   `json:"readOnly"`
-	}
-	mounts := make([]mount, 0, len(recs))
+	mounts := make([]Mount, 0, len(recs))
 	for _, r := range recs {
-		mounts = append(mounts, mount{r.GetString("name"), r.GetBool("read_only")})
+		mounts = append(mounts, Mount{r.GetString("name"), r.GetBool("read_only")})
 	}
-	return e.JSON(http.StatusOK, map[string]any{
-		"id":     e.Auth.Id,
-		"email":  e.Auth.Email(),
-		"server": requestOrigin(e.Request),
-		"mounts": mounts,
-	})
+	return &body[Me]{Me{ID: c.user.Id, Email: c.user.Email(), Server: requestOrigin(c.req), Mounts: mounts}}, nil
 }
 
-func list(e *core.RequestEvent) error {
-	recs, err := e.App.FindRecordsByFilter(schema.AppPasswords, "user = {:u}", "-created", 0, 0,
-		dbx.Params{"u": e.Auth.Id})
+func (h *handlers) listPasswords(ctx context.Context, _ *struct{}) (*body[[]AppPassword], error) {
+	recs, err := h.app.FindRecordsByFilter(schema.AppPasswords, "user = {:u}", "-created", 0, 0,
+		dbx.Params{"u": from(ctx).user.Id})
 	if err != nil {
-		return e.InternalServerError("", err)
+		return nil, err
 	}
-	out := make([]AppPasswordView, 0, len(recs))
+	out := make([]AppPassword, 0, len(recs))
 	for _, r := range recs {
 		out = append(out, view(r))
 	}
-	return e.JSON(http.StatusOK, out)
+	return &body[[]AppPassword]{out}, nil
 }
 
-type createReq struct {
-	Label  string   `json:"label"`
-	Scopes []string `json:"scopes"`
-	Paths  []string `json:"paths"`
-}
-
-func create(e *core.RequestEvent) error {
-	var req createReq
-	if err := e.BindBody(&req); err != nil {
-		return e.BadRequestError("Invalid request body.", err)
+func (h *handlers) createPassword(ctx context.Context, in *createPasswordInput) (*body[AppPassword], error) {
+	uid := from(ctx).user.Id
+	label := strings.TrimSpace(in.Body.Label)
+	if label == "" {
+		return nil, huma.Error422UnprocessableEntity("Label must not be blank.")
 	}
-	label := strings.TrimSpace(req.Label)
-	if label == "" || len([]rune(label)) > 100 {
-		return e.BadRequestError("Label must be 1–100 characters.", nil)
-	}
-	scopes, ok := cleanScopes(req.Scopes)
-	if !ok {
-		return e.BadRequestError("Choose at least one of: cal, card, files.", nil)
-	}
-	paths, err := auth.NormalizePaths(req.Paths, e.Auth.Id)
+	scopes := cleanScopes(in.Body.Scopes)
+	paths, err := auth.NormalizePaths(in.Body.Paths, uid)
 	if err != nil {
-		return e.BadRequestError(err.Error(), nil)
+		return nil, huma.Error422UnprocessableEntity(err.Error())
 	}
-	active, err := e.App.CountRecords(schema.AppPasswords,
-		dbx.HashExp{"user": e.Auth.Id, "revoked_at": ""})
+	active, err := h.app.CountRecords(schema.AppPasswords, dbx.HashExp{"user": uid, "revoked_at": ""})
 	if err != nil {
-		return e.InternalServerError("", err)
+		return nil, err
 	}
 	if active >= MaxPasswordsPerUser {
-		return e.BadRequestError("Too many active App Passwords; revoke some first.", nil)
+		return nil, huma.Error422UnprocessableEntity("Too many active App Passwords; revoke some first.")
 	}
-
-	coll, err := e.App.FindCollectionByNameOrId(schema.AppPasswords)
+	coll, err := h.app.FindCollectionByNameOrId(schema.AppPasswords)
 	if err != nil {
-		return e.InternalServerError("", err)
+		return nil, err
 	}
 	secret := auth.NewSecret()
 	rec := core.NewRecord(coll)
-	rec.Set("user", e.Auth.Id)
+	rec.Set("user", uid)
 	rec.Set("label", label)
 	rec.Set("scopes", scopes)
 	rec.Set("paths", paths)
 	rec.Set("secret_hash", auth.HashSecret(secret))
-	if err := e.App.Save(rec); err != nil {
-		return e.InternalServerError("", err)
+	if err := h.app.Save(rec); err != nil {
+		return nil, err
 	}
 	v := view(rec)
 	v.Secret = secret
-	return e.JSON(http.StatusCreated, v)
+	return &body[AppPassword]{v}, nil
 }
 
-func revoke(e *core.RequestEvent) error {
-	rec, err := e.App.FindFirstRecordByFilter(schema.AppPasswords, "id = {:id} && user = {:u}",
-		dbx.Params{"id": e.Request.PathValue("id"), "u": e.Auth.Id})
+func (h *handlers) findPassword(ctx context.Context, id string) (*core.Record, error) {
+	rec, err := h.app.FindFirstRecordByFilter(schema.AppPasswords, "id = {:id} && user = {:u}",
+		dbx.Params{"id": id, "u": from(ctx).user.Id})
 	if err != nil {
-		return e.NotFoundError("", nil) // also for other users' passwords
+		return nil, huma.Error404NotFound("No such App Password.") // also for other users' passwords
+	}
+	return rec, nil
+}
+
+func (h *handlers) updatePassword(ctx context.Context, in *updatePasswordInput) (*body[AppPassword], error) {
+	rec, err := h.findPassword(ctx, in.ID)
+	if err != nil {
+		return nil, err
+	}
+	if rec.GetString("revoked_at") != "" {
+		return nil, huma.Error409Conflict("This App Password is revoked.")
+	}
+	if in.Body.Label != nil {
+		label := strings.TrimSpace(*in.Body.Label)
+		if label == "" {
+			return nil, huma.Error422UnprocessableEntity("Label must not be blank.")
+		}
+		rec.Set("label", label)
+	}
+	if in.Body.Scopes != nil {
+		rec.Set("scopes", cleanScopes(in.Body.Scopes))
+	}
+	if in.Body.Paths != nil {
+		paths, err := auth.NormalizePaths(*in.Body.Paths, from(ctx).user.Id)
+		if err != nil {
+			return nil, huma.Error422UnprocessableEntity(err.Error())
+		}
+		rec.Set("paths", paths)
+	}
+	if err := h.app.Save(rec); err != nil {
+		return nil, err
+	}
+	return &body[AppPassword]{view(rec)}, nil
+}
+
+func (h *handlers) revokePassword(ctx context.Context, in *idPath) (*body[AppPassword], error) {
+	rec, err := h.findPassword(ctx, in.ID)
+	if err != nil {
+		return nil, err
 	}
 	if rec.GetString("revoked_at") == "" {
 		dt, _ := types.ParseDateTime(time.Now().UTC())
 		rec.Set("revoked_at", dt)
-		if err := e.App.Save(rec); err != nil {
-			return e.InternalServerError("", err)
+		if err := h.app.Save(rec); err != nil {
+			return nil, err
 		}
 	}
-	return e.JSON(http.StatusOK, view(rec))
+	return &body[AppPassword]{view(rec)}, nil
 }
 
-// cleanScopes dedupes and validates; ok is false if none are valid or any
-// is unknown.
-func cleanScopes(in []string) ([]string, bool) {
-	valid := map[string]bool{}
-	for _, s := range auth.AllScopes {
-		valid[s] = true
-	}
+// cleanScopes dedupes and sorts; Huma has already checked the values.
+func cleanScopes(in []string) []string {
 	seen := map[string]bool{}
 	var out []string
 	for _, s := range in {
-		if !valid[s] {
-			return nil, false
-		}
 		if !seen[s] {
 			seen[s] = true
 			out = append(out, s)
 		}
 	}
 	sort.Strings(out)
-	return out, len(out) > 0
+	return out
 }
 
 func requestOrigin(r *http.Request) string {

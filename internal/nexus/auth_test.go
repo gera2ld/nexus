@@ -48,7 +48,8 @@ func newServer(t *testing.T) *server {
 	mounts := storage.NewManager(app, nil)
 	mounts.Bind(app)
 	t.Cleanup(mounts.Close)
-	mount(r, newHandler(app, store.New(app), mounts))
+	st := store.New(app)
+	mount(r, app, newHandler(app, st, mounts), st)
 	mux, err := r.BuildMux()
 	if err != nil {
 		t.Fatal(err)
@@ -113,13 +114,13 @@ func (s *server) user(email string) (*core.Record, string) {
 }
 
 // newPassword creates an App Password through the account API.
-func (s *server) newPassword(tok, label string, scopes ...string) account.AppPasswordView {
+func (s *server) newPassword(tok, label string, scopes ...string) account.AppPassword {
 	s.t.Helper()
 	r := s.do("POST", "/api/nexus/app-passwords", map[string]any{"label": label, "scopes": scopes}, bearer(tok))
 	if r.code != http.StatusCreated {
 		s.t.Fatalf("create app password: %d %s", r.code, r.body)
 	}
-	var v account.AppPasswordView
+	var v account.AppPassword
 	if err := json.Unmarshal([]byte(r.body), &v); err != nil {
 		s.t.Fatal(err)
 	}
@@ -127,7 +128,7 @@ func (s *server) newPassword(tok, label string, scopes ...string) account.AppPas
 }
 
 // newPasswordWithPaths creates an App Password with a path restriction.
-func (s *server) newPasswordWithPaths(tok, label string, paths []string, scopes ...string) account.AppPasswordView {
+func (s *server) newPasswordWithPaths(tok, label string, paths []string, scopes ...string) account.AppPassword {
 	s.t.Helper()
 	r := s.do("POST", "/api/nexus/app-passwords", map[string]any{
 		"label": label, "scopes": scopes, "paths": paths,
@@ -135,7 +136,7 @@ func (s *server) newPasswordWithPaths(tok, label string, paths []string, scopes 
 	if r.code != http.StatusCreated {
 		s.t.Fatalf("create path-restricted app password: %d %s", r.code, r.body)
 	}
-	var v account.AppPasswordView
+	var v account.AppPassword
 	if err := json.Unmarshal([]byte(r.body), &v); err != nil {
 		s.t.Fatal(err)
 	}
@@ -233,8 +234,8 @@ func TestAppPasswordPaths(t *testing.T) {
 		r := s.do("POST", "/api/nexus/app-passwords", map[string]any{
 			"label": "bad", "scopes": []string{"cal"}, "paths": paths,
 		}, bearer(tok))
-		if r.code != http.StatusBadRequest {
-			t.Errorf("paths %v: got %d, want 400", paths, r.code)
+		if r.code != http.StatusUnprocessableEntity {
+			t.Errorf("paths %v: got %d, want 422", paths, r.code)
 		}
 	}
 
@@ -537,8 +538,8 @@ func TestAccountAPI(t *testing.T) {
 		"empty label":    {"label": "   ", "scopes": []string{"cal"}},
 		"label too long": {"label": strings.Repeat("é", 101), "scopes": []string{"cal"}},
 	} {
-		if r := s.do("POST", "/api/nexus/app-passwords", body, bearer(tok)); r.code != http.StatusBadRequest {
-			t.Errorf("%s: %d, want 400", name, r.code)
+		if r := s.do("POST", "/api/nexus/app-passwords", body, bearer(tok)); r.code != http.StatusUnprocessableEntity {
+			t.Errorf("%s: %d, want 422", name, r.code)
 		}
 	}
 
@@ -565,13 +566,13 @@ func TestAccountAPI(t *testing.T) {
 func TestActivePasswordLimit(t *testing.T) {
 	s := newServer(t)
 	_, tok := s.user("ada@example.com")
-	var last account.AppPasswordView
+	var last account.AppPassword
 	for i := 0; i < account.MaxPasswordsPerUser; i++ {
 		last = s.newPassword(tok, "p", "cal")
 	}
 	body := map[string]any{"label": "one too many", "scopes": []string{"cal"}}
-	if r := s.do("POST", "/api/nexus/app-passwords", body, bearer(tok)); r.code != http.StatusBadRequest {
-		t.Fatalf("over the limit: %d, want 400", r.code)
+	if r := s.do("POST", "/api/nexus/app-passwords", body, bearer(tok)); r.code != http.StatusUnprocessableEntity {
+		t.Fatalf("over the limit: %d, want 422", r.code)
 	}
 	s.do("POST", "/api/nexus/app-passwords/"+last.ID+"/revoke", nil, bearer(tok))
 	if r := s.do("POST", "/api/nexus/app-passwords", body, bearer(tok)); r.code != http.StatusCreated {
