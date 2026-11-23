@@ -42,7 +42,8 @@ export function Layout({
             <img src={`${import.meta.env.BASE_URL}favicon.svg`} alt="" className="size-6" />
             {title}
           </Link>
-          <nav className="order-last flex w-full flex-wrap gap-1 md:order-none md:w-auto">
+          {/* On small screens the tabs get their own row, which scrolls sideways instead of wrapping. */}
+          <nav className="order-last -mx-4 flex w-[calc(100%+2rem)] gap-1 overflow-x-auto px-4 [scrollbar-width:none] md:order-none md:mx-0 md:w-auto md:px-0">
             {nav.map(({ to, label, icon: Icon, end }) => (
               <NavLink
                 key={to}
@@ -50,7 +51,7 @@ export function Layout({
                 end={end}
                 className={({ isActive }) =>
                   cn(
-                    "flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                    "flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm whitespace-nowrap text-muted-foreground hover:bg-accent hover:text-accent-foreground",
                     isActive && "bg-accent font-medium text-accent-foreground",
                   )
                 }
