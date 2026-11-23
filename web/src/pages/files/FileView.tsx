@@ -1,9 +1,9 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Download, ExternalLink, File, Link2, Save } from "lucide-react";
+import { ExternalLink, File, Save } from "lucide-react";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { useBlocker } from "react-router";
 import { toast } from "sonner";
-import { DavError, parentOf, rawPath, rawURL, readText, stat, writeText, type Entry } from "@/api/dav";
+import { DavError, parentOf, rawPath, readText, stat, writeText, type Entry } from "@/api/dav";
 import { Confirm } from "@/components/Confirm";
 import { Loading } from "@/components/Layout";
 import {
@@ -16,7 +16,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { copy } from "@/hooks/use-copy";
 import { formatSize, formatTime } from "@/lib/format";
 import { FolderView } from "./Files";
 import { Crumbs, useReadOnly } from "./common";
@@ -84,17 +83,9 @@ function FileHeader({ entry: e, children }: { entry: Entry; children?: React.Rea
         </span>
         {children}
         <Button variant="outline" size="sm" asChild>
-          <a href={rawPath(e.path) + "?download"}>
-            <Download /> Download
-          </a>
-        </Button>
-        <Button variant="outline" size="sm" asChild>
           <a href={rawPath(e.path)} target="_blank" rel="noreferrer">
-            <ExternalLink /> Open raw
+            <ExternalLink /> Raw
           </a>
-        </Button>
-        <Button variant="outline" size="sm" onClick={() => copy(rawURL(e.path), "Raw link copied")}>
-          <Link2 /> Copy raw link
         </Button>
       </div>
     </div>
@@ -122,7 +113,7 @@ async function load(e: Entry, sniff: boolean): Promise<Loaded> {
     const head = await readText(e.path, SNIFF_BYTES);
     if (head.bytes.includes(0)) return { ok: false, why: "No preview for this kind of file." };
   }
-  if (e.size > OPEN_LIMIT) return { ok: false, why: `This file is too large to open here (${formatSize(e.size)}). Download it instead.` };
+  if (e.size > OPEN_LIMIT) return { ok: false, why: `This file is too large to open here (${formatSize(e.size)}). Open it with Raw instead.` };
   const { bytes, etag } = await readText(e.path);
   try {
     return { ok: true, text: new TextDecoder("utf-8", { fatal: true }).decode(bytes), etag };

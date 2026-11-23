@@ -156,8 +156,8 @@ encryption stay in `internal/storage`:
 - Create folders; rename, move, copy and delete (with multi-select);
   upload files by picking or dropping them. Uploads are one `PUT` per file,
   with progress; there are no resumable or folder uploads yet.
-- Download a file; "copy raw link" and "open raw" use `/dav/files/…`; "share"
-  creates a share link (§6.3).
+- "Raw" opens a file's `/dav/files/…` link in a new tab; right-click it to
+  save or copy the link. "Share" creates a share link (§6.3).
 - It talks WebDAV to `/dav/files` with the dashboard token: `PROPFIND Depth 1`
   to list, `PUT`, `MKCOL`, `MOVE`, `COPY`, `DELETE`. All existing checks
   (read-only mounts, the top level, cross-mount moves) apply unchanged.

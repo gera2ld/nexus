@@ -3,14 +3,12 @@ import {
   ArrowUp,
   ChevronRight,
   Copy,
-  Download,
   ExternalLink,
   File,
   Folder,
   FolderInput,
   FolderPlus,
   HardDrive,
-  Link2,
   MoreHorizontal,
   Pencil,
   Trash2,
@@ -20,7 +18,7 @@ import {
 import { useEffect, useRef, useState, type DragEvent, type FormEvent } from "react";
 import { Link, useParams } from "react-router";
 import { toast } from "sonner";
-import { badName, list, mkcol, mountOf, parentOf, rawPath, rawURL, remove, setUser, transfer, upload, type Entry } from "@/api/dav";
+import { badName, list, mkcol, mountOf, parentOf, rawPath, remove, setUser, transfer, upload, type Entry } from "@/api/dav";
 import { Confirm } from "@/components/Confirm";
 import { Loading, NotFound } from "@/components/Layout";
 import { Badge } from "@/components/ui/badge";
@@ -38,7 +36,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useMe } from "@/hooks/queries";
-import { copy } from "@/hooks/use-copy";
 import { useAuth } from "@/lib/auth";
 import { formatSize, formatTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -473,17 +470,9 @@ function RowMenu(props: { entry: Entry; readOnly: boolean; onRename: () => void;
         {!e.dir && (
           <>
             <DropdownMenuItem asChild>
-              <a href={rawPath(e.path) + "?download"}>
-                <Download /> Download
-              </a>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
               <a href={rawPath(e.path)} target="_blank" rel="noreferrer">
-                <ExternalLink /> Open raw
+                <ExternalLink /> Raw
               </a>
-            </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => copy(rawURL(e.path), "Raw link copied")}>
-              <Link2 /> Copy raw link
             </DropdownMenuItem>
             <DropdownMenuSeparator />
           </>
