@@ -160,6 +160,7 @@ func TestAdminBrowseAndMounts(t *testing.T) {
 	for name, body := range map[string]map[string]any{
 		"bad name":      {"user": u.Id, "account": disk.ID, "name": "My Docs", "remotePath": root},
 		"relative path": {"user": u.Id, "account": disk.ID, "name": "x", "remotePath": "srv"},
+		"empty path":    {"user": u.Id, "account": disk.ID, "name": "x", "remotePath": ""},
 		"same name":     {"user": u.Id, "account": disk.ID, "name": "docs", "remotePath": root},
 		"no such user":  {"user": "nosuchuser1234", "account": disk.ID, "name": "x", "remotePath": root},
 	} {

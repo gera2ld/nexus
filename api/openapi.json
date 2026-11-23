@@ -355,8 +355,8 @@
             "type": "boolean"
           },
           "remotePath": {
+            "description": "An absolute directory for local disk; bucket or bucket/prefix for S3, or empty for all buckets",
             "maxLength": 1024,
-            "minLength": 1,
             "type": "string"
           },
           "user": {
@@ -847,7 +847,6 @@
           },
           "remotePath": {
             "maxLength": 1024,
-            "minLength": 1,
             "type": "string"
           }
         },

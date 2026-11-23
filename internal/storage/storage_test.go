@@ -206,6 +206,8 @@ func TestMountPaths(t *testing.T) {
 		{local.Id, t.TempDir(), true},
 		{local.Id, "relative/dir", false},
 		{local.Id, "/srv/../etc", false},
+		{local.Id, "", false},
+		{s3.Id, "", true}, // all buckets
 		{s3.Id, "bucket/prefix", true},
 		{s3.Id, "/bucket", false},
 		{s3.Id, "bucket/../other", false},

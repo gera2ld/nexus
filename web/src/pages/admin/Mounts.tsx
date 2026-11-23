@@ -64,7 +64,7 @@ export function Mounts() {
                   </TableCell>
                   <TableCell className="max-w-64 whitespace-normal">
                     <div>{m.account.name}</div>
-                    <div className="font-mono text-xs break-all text-muted-foreground">{m.remotePath}</div>
+                    <div className="font-mono text-xs break-all text-muted-foreground">{m.remotePath || "all buckets"}</div>
                   </TableCell>
                   <TableCell className="text-right whitespace-nowrap">
                     <Button variant="ghost" size="sm" onClick={() => setEditing(m)}>Edit</Button>
@@ -166,14 +166,20 @@ function MountForm({ mount, onClose }: { mount?: AdminMount; onClose: () => void
                   id="m-path"
                   value={remotePath}
                   onChange={(e) => setRemotePath(e.target.value)}
-                  required
+                  required={account?.type !== "s3"}
                   className="font-mono"
-                  placeholder={account?.type === "s3" ? "bucket/prefix" : "/srv/nexus/ada"}
+                  placeholder={account?.type === "s3" ? "All buckets" : "/srv/nexus/ada"}
                 />
                 <Button type="button" variant="outline" disabled={!account} onClick={() => setPicking(true)}>
                   <FolderOpen /> Browse
                 </Button>
               </div>
+              {account?.type === "s3" && (
+                <p className="text-xs text-muted-foreground">
+                  bucket or bucket/prefix. Empty shows every bucket the account can list, and folders at the top are buckets:
+                  creating or deleting one there creates or deletes a bucket.
+                </p>
+              )}
             </div>
             <Label className="font-normal">
               <Checkbox checked={readOnly} onCheckedChange={(c) => setReadOnly(!!c)} />

@@ -333,7 +333,10 @@ add about 22 MB to the binary.
 - **Mounts** (`mounts`, superuser-only): `user` (cascade on user delete),
   `account` (an account in use can't be deleted), `name` (a lowercase slug,
   the URL segment), `remote_path` (the root within the account: an absolute
-  directory for `local`, `bucket/prefix` for `s3`), `read_only`.
+  directory for `local`; `bucket` or `bucket/prefix` for `s3`, or empty for
+  every bucket the credentials can list, where top-level folders are
+  buckets and creating or deleting one creates or deletes a bucket),
+  `read_only`.
 - **Storage manager** (`internal/storage`): maps (user, mount name) to a
   cached `vfs.VFS` built from the account's type, options and decrypted
   secrets, rooted at `remote_path`. Options the account doesn't set get

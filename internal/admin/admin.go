@@ -313,7 +313,7 @@ type createMountInput struct {
 		User       string `json:"user" minLength:"1"`
 		Account    string `json:"account" minLength:"1"`
 		Name       string `json:"name" pattern:"^[a-z0-9][a-z0-9._-]*$" patternDescription:"lower-case letters, digits, . _ and -, starting with a letter or digit" maxLength:"64"`
-		RemotePath string `json:"remotePath" minLength:"1" maxLength:"1024"`
+		RemotePath string `json:"remotePath" maxLength:"1024" doc:"An absolute directory for local disk; bucket or bucket/prefix for S3, or empty for all buckets"`
 		ReadOnly   bool   `json:"readOnly,omitempty"`
 	}
 }
@@ -323,7 +323,7 @@ type updateMountInput struct {
 	Body struct {
 		Account    *string `json:"account,omitempty" minLength:"1"`
 		Name       *string `json:"name,omitempty" pattern:"^[a-z0-9][a-z0-9._-]*$" patternDescription:"lower-case letters, digits, . _ and -, starting with a letter or digit" maxLength:"64"`
-		RemotePath *string `json:"remotePath,omitempty" minLength:"1" maxLength:"1024"`
+		RemotePath *string `json:"remotePath,omitempty" maxLength:"1024"`
 		ReadOnly   *bool   `json:"readOnly,omitempty"`
 	}
 }

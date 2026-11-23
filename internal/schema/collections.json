@@ -1314,7 +1314,7 @@
       },
       {
         "autogeneratePattern": "",
-        "help": "Root within the account: an absolute directory for local, bucket/prefix for s3",
+        "help": "Root within the account: an absolute directory for local, bucket or bucket/prefix for s3, or empty for all buckets",
         "hidden": false,
         "id": "text_m_remote_path",
         "max": 1024,
@@ -1323,7 +1323,7 @@
         "pattern": "",
         "presentable": false,
         "primaryKey": false,
-        "required": true,
+        "required": false,
         "system": false,
         "type": "text"
       },

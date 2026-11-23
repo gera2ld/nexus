@@ -149,8 +149,9 @@ func checkRemotePath(typ, p string) error {
 			return fmt.Errorf("must be an absolute directory, like /srv/nexus/ada")
 		}
 	case "s3":
-		if strings.HasPrefix(p, "/") || path.Clean(p) == "." {
-			return fmt.Errorf("must be bucket or bucket/prefix, with no leading /")
+		// Empty is the account's whole bucket list.
+		if strings.HasPrefix(p, "/") || (p != "" && path.Clean(p) == ".") {
+			return fmt.Errorf("must be bucket or bucket/prefix with no leading /, or empty for all buckets")
 		}
 	}
 	return nil

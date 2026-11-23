@@ -122,7 +122,8 @@ the admin UI, so its change log goes with it.
   - **Test connection:** lists the top of the account (or a path in it)
     and shows rclone's error if that fails.
 - **Mounts:** per user: account, name, remote path, read-only. A remote
-  path picker uses the same listing as the connection test.
+  path picker uses the same listing as the connection test. For S3 the
+  path may be empty (all buckets), shown as "all buckets" in the list.
 - Users, logs and backups stay in the PocketBase admin UI (`/_/`), linked
   from the dashboard.
 - **The settings form comes from rclone:** the account's main options for

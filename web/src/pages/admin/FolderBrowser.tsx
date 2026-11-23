@@ -90,7 +90,7 @@ export function FolderBrowser(props: {
         <DialogFooter>
           <Button type="button" variant="outline" onClick={props.onClose}>{props.onPick ? "Cancel" : "Close"}</Button>
           {props.onPick && (
-            <Button type="button" disabled={!list.data || atTop} onClick={() => props.onPick!(shown)}>
+            <Button type="button" disabled={!list.data || (atTop && account.type === "local")} onClick={() => props.onPick!(shown)}>
               Use this folder
             </Button>
           )}
