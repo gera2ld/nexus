@@ -28,11 +28,12 @@ export function Layout({
   extra?: React.ReactNode;
 }) {
   const { signOut, account } = useAuth();
-  // The Files page and its editor use the width.
-  const width = useLocation().pathname.startsWith("/files") ? "max-w-7xl" : "max-w-5xl";
+  // The Files page fills the window: its tree and content scroll on their own.
+  const fill = useLocation().pathname.startsWith("/files");
+  const width = fill ? "" : "max-w-5xl";
   return (
-    <div className="min-h-svh">
-      <header className="border-b">
+    <div className={fill ? "flex h-svh flex-col" : "min-h-svh"}>
+      <header className="shrink-0 border-b">
         <div className={cn("mx-auto flex flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3", width)}>
           <Link to={home} className="font-semibold">
             {title}
@@ -61,7 +62,7 @@ export function Layout({
           </div>
         </div>
       </header>
-      <main className={cn("mx-auto px-4 py-6", width)}>
+      <main className={cn("mx-auto w-full px-4", fill ? "flex min-h-0 flex-1 flex-col py-4" : "py-6", width)}>
         <Outlet />
       </main>
     </div>

@@ -55,11 +55,11 @@ export function Files() {
   const p = "/" + (params["*"] ?? "");
   const folder = p.endsWith("/");
   return (
-    <div className="grid gap-6 md:grid-cols-[14rem_minmax(0,1fr)]">
-      <aside className="hidden md:block">
+    <div className="grid min-h-0 flex-1 gap-6 md:grid-cols-[14rem_minmax(0,1fr)]">
+      <aside className="hidden min-h-0 overflow-y-auto md:block">
         <Tree current={folder ? p : parentOf(p)} />
       </aside>
-      <section className="min-w-0">{folder ? <FolderView key={p} path={p} /> : <FileView key={p} path={p} />}</section>
+      <section className="flex min-h-0 min-w-0 flex-col overflow-y-auto">{folder ? <FolderView key={p} path={p} /> : <FileView key={p} path={p} />}</section>
     </div>
   );
 }
@@ -73,7 +73,7 @@ function Tree({ current }: { current: string }) {
   const top = useListing("/");
   const link = useFilesLink();
   return (
-    <nav aria-label="Mounts and folders" className="sticky top-4 text-sm">
+    <nav aria-label="Mounts and folders" className="text-sm">
       <Link to={link("/")} className={cn("block rounded-md px-2 py-1 font-medium hover:bg-accent", current === "/" && "bg-accent")}>
         Files
       </Link>
@@ -220,7 +220,7 @@ export function FolderView({ path }: { path: string }) {
         if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragging(false);
       }}
       onDrop={onDrop}
-      className={cn("min-h-[60vh] rounded-lg", dragging && "outline-2 outline-offset-4 outline-primary outline-dashed")}
+      className={cn("flex-1 rounded-lg", dragging && "outline-2 -outline-offset-2 outline-primary outline-dashed")}
     >
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <Crumbs path={path} />

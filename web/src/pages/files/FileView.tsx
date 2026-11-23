@@ -63,11 +63,12 @@ export function FileView({ path }: { path: string }) {
   return (
     <>
       <FileHeader entry={e} />
-      <div className="grid place-items-center rounded-lg border bg-muted/30 p-4">
-        {kind === "image" && <img src={src} alt={e.name} className="max-h-[75vh] max-w-full object-contain" />}
-        {kind === "video" && <video src={src} controls className="max-h-[75vh] max-w-full" />}
+      {/* Absolute children take the box's size: shrunk to fit, never enlarged. */}
+      <div className="relative grid min-h-80 flex-1 place-items-center rounded-lg border bg-muted/30 p-4">
+        {kind === "image" && <img src={src} alt={e.name} className="absolute inset-4 m-auto max-h-[calc(100%-2rem)] max-w-[calc(100%-2rem)]" />}
+        {kind === "video" && <video src={src} controls className="absolute inset-4 m-auto max-h-[calc(100%-2rem)] max-w-[calc(100%-2rem)]" />}
         {kind === "audio" && <audio src={src} controls className="w-full max-w-xl" />}
-        {kind === "pdf" && <iframe src={src} title={e.name} className="h-[80vh] w-full rounded bg-white" />}
+        {kind === "pdf" && <iframe src={src} title={e.name} className="absolute inset-0 size-full rounded-lg bg-white" />}
       </div>
     </>
   );
@@ -75,7 +76,7 @@ export function FileView({ path }: { path: string }) {
 
 function FileHeader({ entry: e, children }: { entry: Entry; children?: React.ReactNode }) {
   return (
-    <div className="mb-4 grid gap-3">
+    <div className="mb-4 grid shrink-0 gap-3">
       <Crumbs path={e.path} />
       <div className="flex flex-wrap items-center gap-2">
         <span className="mr-auto text-sm text-muted-foreground">
@@ -201,7 +202,7 @@ function TextFile({ entry: e, sniff }: { entry: Entry; sniff: boolean }) {
       {tooBig && !mountReadOnly && (
         <p className="mb-3 text-sm text-muted-foreground">This file is over {formatSize(EDIT_LIMIT)}, so it opens read-only.</p>
       )}
-      <div className="h-[70vh] overflow-hidden rounded-lg border">
+      <div className="min-h-80 flex-1 overflow-hidden rounded-lg border">
         <Suspense fallback={<p className="p-4 text-sm text-muted-foreground">Loading the editor…</p>}>
           <Editor
             key={generation}
