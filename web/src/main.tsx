@@ -10,7 +10,7 @@ import { AuthProvider, useAuth } from "@/lib/auth";
 import { Mounts } from "@/pages/admin/Mounts";
 import { Storage } from "@/pages/admin/Storage";
 import { AppPasswords } from "@/pages/AppPasswords";
-import { Browser } from "@/pages/browser/Browser";
+import { Files } from "@/pages/files/Files";
 import { Collections } from "@/pages/Collections";
 import { Overview } from "@/pages/Overview";
 import { SignIn } from "@/pages/SignIn";
@@ -28,7 +28,7 @@ const queryClient = new QueryClient({
 
 const accountNav: NavItem[] = [
   { to: "/", label: "Overview", icon: House, end: true },
-  { to: "/browser", label: "Files", icon: FolderOpen },
+  { to: "/files", label: "Files", icon: FolderOpen },
   { to: "/account/app-passwords", label: "App Passwords", icon: KeyRound },
   { to: "/account/calendars", label: "Calendars", icon: CalendarDays },
   { to: "/account/contacts", label: "Contacts", icon: Contact },
@@ -46,7 +46,7 @@ const pocketbaseLink = (
   </a>
 );
 
-// The user pages (/, /account and /browser) and /admin are separate sign-ins (users and superusers), so each
+// The user pages (/, /account and /files) and /admin are separate sign-ins (users and superusers), so each
 // page load gets only its own routes; moving between them is a page load.
 const router = createBrowserRouter(
   realm === "users"
@@ -60,9 +60,9 @@ const router = createBrowserRouter(
             { path: "account/app-passwords", element: <AppPasswords /> },
             { path: "account/calendars", element: <Collections key="calendars" kind="calendars" /> },
             { path: "account/contacts", element: <Collections key="addressbooks" kind="addressbooks" /> },
-            // /browser shows the mounts too, so there's nothing to redirect.
-            { path: "browser", element: <Browser /> },
-            { path: "browser/:uid/*", element: <Browser /> },
+            // /files shows the mounts too, so there's nothing to redirect.
+            { path: "files", element: <Files /> },
+            { path: "files/:uid/*", element: <Files /> },
             { path: "*", element: <NotFound home="/" /> },
           ],
         },

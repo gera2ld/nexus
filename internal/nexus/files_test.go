@@ -25,7 +25,7 @@ func newFilesEnv(t *testing.T) *filesEnv {
 	s := newServer(t)
 	u, tok := s.user("ada@example.com")
 	pw := s.newPassword(tok, "files", "files")
-	f := &filesEnv{server: s, uid: u.Id, base: "/files/" + u.Id, userTok: tok,
+	f := &filesEnv{server: s, uid: u.Id, base: "/dav/files/" + u.Id, userTok: tok,
 		docs: t.TempDir(), arch: t.TempDir(), scratch: t.TempDir(), creds: basic("ada@example.com", pw.Secret)}
 	os.WriteFile(filepath.Join(f.arch, "old.txt"), []byte("archived"), 0o644)
 
@@ -73,11 +73,16 @@ func nilIfEmpty(s string) any {
 func TestFilesDiscoveryAndAccess(t *testing.T) {
 	f := newFilesEnv(t)
 
-	if r := f.do("PROPFIND", "/files", nil, f.creds); r.code != http.StatusMovedPermanently || r.hdr.Get("Location") != "/files/" {
-		t.Errorf("/files: %d -> %q", r.code, r.hdr.Get("Location"))
+	for _, p := range []string{"/dav/files", "/dav/files/"} {
+		if r := f.do("PROPFIND", p, nil, f.creds); r.code != http.StatusMovedPermanently || r.hdr.Get("Location") != f.base+"/" {
+			t.Errorf("%s: %d -> %q", p, r.code, r.hdr.Get("Location"))
+		}
 	}
-	if r := f.do("PROPFIND", "/files/", nil, f.creds); r.code != http.StatusMovedPermanently || r.hdr.Get("Location") != f.base+"/" {
-		t.Errorf("/files/: %d -> %q", r.code, r.hdr.Get("Location"))
+	// /files is the web app's page now; WebDAV there is gone.
+	for _, p := range []string{"/files", "/files/", "/files/" + f.uid + "/docs/"} {
+		if r := f.do("PROPFIND", p, nil, f.creds); r.code == http.StatusMultiStatus || r.code < 400 {
+			t.Errorf("PROPFIND %s: %d, want an error", p, r.code)
+		}
 	}
 	r := f.req("PROPFIND", "/", "", "Depth", "1")
 	if r.code != http.StatusMultiStatus {
@@ -362,7 +367,7 @@ func TestFilesDashboardToken(t *testing.T) {
 		}
 	}
 	if r.code != http.StatusNoContent || cookie == nil || cookie.Value != f.userTok || !cookie.HttpOnly ||
-		cookie.Path != "/files/" || cookie.SameSite != http.SameSiteLaxMode || cookie.Expires.IsZero() {
+		cookie.Path != "/dav/files/" || cookie.SameSite != http.SameSiteLaxMode || cookie.Expires.IsZero() {
 		t.Fatalf("POST /session: %d %v", r.code, r.hdr["Set-Cookie"])
 	}
 	withCookie := func(r *http.Request) { r.AddCookie(cookie) }
@@ -412,5 +417,34 @@ func TestFilesRawHeaders(t *testing.T) {
 	}
 	if r := f.req("GET", "/docs/notes.md", "", "Range", "bytes=0-1"); r.code != http.StatusPartialContent || r.body != "# " {
 		t.Errorf("Range: %d %q", r.code, r.body)
+	}
+}
+
+// TestMigratePasswordPaths: path limits saved while files lived at /files
+// are rewritten at startup, and keep working.
+func TestMigratePasswordPaths(t *testing.T) {
+	f := newFilesEnv(t)
+	pw := f.newPasswordWithPaths(f.userTok, "old", []string{"/dav/files/docs/"}, "files", "cal")
+	rec, err := f.app.FindRecordById(schema.AppPasswords, pw.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rec.Set("paths", []string{"/dav/", "/files/docs/"}) // as stored before the move
+	if err := f.app.Save(rec); err != nil {
+		t.Fatal(err)
+	}
+	if err := migratePasswordPaths(f.app); err != nil {
+		t.Fatal(err)
+	}
+	rec, _ = f.app.FindRecordById(schema.AppPasswords, pw.ID)
+	if got := strings.Join(rec.GetStringSlice("paths"), ","); got != "/dav/calendars/,/dav/contacts/,/dav/files/docs/" {
+		t.Fatalf("migrated paths: %s", got)
+	}
+	creds := basic("ada@example.com", pw.Secret)
+	if r := f.do("PROPFIND", f.base+"/docs/", nil, func(r *http.Request) { creds(r); r.Header.Set("Depth", "1") }); r.code != http.StatusMultiStatus {
+		t.Errorf("docs after the rewrite: %d", r.code)
+	}
+	if r := f.do("PROPFIND", f.base+"/scratch/", nil, func(r *http.Request) { creds(r); r.Header.Set("Depth", "1") }); r.code != http.StatusForbidden {
+		t.Errorf("scratch (old /dav/ didn't cover files): %d, want 403", r.code)
 	}
 }

@@ -34,7 +34,7 @@ export function Overview() {
           </CardHeader>
           <CardContent className="grid gap-3 text-sm">
             <Row label="Address">
-              <CopyField value={`${server}/files/`} label="Files address" />
+              <CopyField value={`${server}/dav/files/`} label="Files address" />
             </Row>
             <Row label="Mounts">
               {mounts.length === 0 ? (
@@ -44,7 +44,7 @@ export function Overview() {
                   {mounts.map((m) => (
                     <li key={m.name}>
                       <Badge variant="secondary" asChild>
-                        <Link to={`/browser/${id}/${encodeURIComponent(m.name)}/`}>
+                        <Link to={`/files/${id}/${encodeURIComponent(m.name)}/`}>
                         {m.name}
                         {m.readOnly && <span className="font-normal text-muted-foreground"> · read-only</span>}
                         </Link>

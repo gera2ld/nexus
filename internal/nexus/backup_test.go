@@ -96,7 +96,7 @@ func TestBackupRestoreRoundTrip(t *testing.T) {
 	if got := b.propfind("/dav/"+u.Id+"/contacts/contacts/", creds); got != http.StatusMultiStatus {
 		t.Errorf("address book after restore: %d", got)
 	}
-	if r := b.do("PUT", "/files/"+u.Id+"/home/after.txt", "x", creds); r.code != http.StatusCreated {
+	if r := b.do("PUT", "/dav/files/"+u.Id+"/home/after.txt", "x", creds); r.code != http.StatusCreated {
 		t.Errorf("files after restore: %d %s", r.code, r.body)
 	}
 	restored, err := b.app.FindRecordById(schema.StorageAccounts, s3.Id)

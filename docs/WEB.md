@@ -16,8 +16,8 @@ Product scope: [PRODUCT.md](PRODUCT.md) §3.5. Server architecture:
 |---|---|
 | Framework | React, React Router, shadcn/ui on Tailwind, TanStack Query; built with Vite. shadcn/ui is React-first; the Vue port lags behind it |
 | Shipping | `npm run build` output is embedded in the Go binary (`go:embed`), so Nexus stays one binary and one image |
-| Raw files | `/files/{uid}/…` stays the raw content (WebDAV, as now) |
-| File browser | `/browser/{uid}/…`: the same path under a different prefix |
+| Raw files | `/dav/files/{uid}/…`: WebDAV, next to calendars and contacts under `/dav` (moved from `/files` on 2026-11-23) |
+| Files page | `/files/{uid}/…`: the same path without the `/dav` prefix |
 | Published folders | Share links at `/s/{token}/…` on the main domain. A folder serves its `index.html`; relative paths are the author's job. No subdomains |
 | Isolation | Share responses are sandboxed without `allow-same-origin` (§6.4) |
 | Editor | Monaco for every text file, loaded only when a file is opened |
@@ -33,23 +33,23 @@ Product scope: [PRODUCT.md](PRODUCT.md) §3.5. Server architecture:
 /account/shares               share links
 /admin                        admin dashboard: storage accounts
 /admin/mounts                 mounts
-/browser                      file browser: the signed-in user's mounts
-/browser/{uid}/               the same list
-/browser/{uid}/{mount}/path/  a folder
-/browser/{uid}/{mount}/file   a file, opened in the editor or a preview
-/files/{uid}/{mount}/file     the raw file (WebDAV, unchanged)
+/files                        Files page: the signed-in user's mounts
+/files/{uid}/                 the same list
+/files/{uid}/{mount}/path/    a folder
+/files/{uid}/{mount}/file     a file, opened in the editor or a preview
+/dav/files/{uid}/{mount}/file the raw file (WebDAV)
 /s/{token}                    a shared file, or 301 → /s/{token}/ for a folder
 /s/{token}/path               a file inside a shared folder
 /ui/assets/…                  the web app's built assets (hashed names)
 ```
 
-- `/browser/…` and `/files/…` mirror each other, so "open raw" and "open in
-  browser" swap the prefix.
+- `/files/…` and `/dav/files/…` mirror each other, so "open raw" adds the
+  `/dav` prefix.
 - The two serve different purposes and never redirect to each other:
-  `/files/…` is always raw WebDAV, for clients and raw links; `/browser/…`
-  is always the app.
+  `/dav/files/…` is always raw WebDAV, for clients and raw links;
+  `/files/…` is always the app.
 - The Go server answers `/` (GET only), `/account/*`, `/admin`, `/admin/*`
-  and `/browser*` with the app's `index.html`; React Router does the
+  and `/files*` (GET) with the app's `index.html`; React Router does the
   rest. The dashboards don't redirect: `/account` itself is a 404 rather
   than a redirect to `/account/`, and a path the app doesn't know shows its
   "Not found" page.
@@ -60,16 +60,16 @@ Product scope: [PRODUCT.md](PRODUCT.md) §3.5. Server architecture:
   `users` auth). **Admins** sign in as PocketBase superusers on `/admin`.
   The account password still never works for DAV.
 - The app keeps the PocketBase token in `sessionStorage` and sends it as
-  `Authorization: Bearer` to `/api/*` and `/files/*`.
-- **`/files` accepts the dashboard token** as well as App Passwords: a
+  `Authorization: Bearer` to `/api/*` and `/dav/files/*`.
+- **`/dav/files` accepts the dashboard token** as well as App Passwords: a
   `Bearer` token is checked with PocketBase (`FindAuthRecordByToken`) and
   gives the user full access to their own files, like an App Password with
   the `files` scope and no path limit. Browsers never send this header on
   their own, so it opens no CSRF hole.
-- **A session cookie for raw links.** Links to `/files/…` opened in a new
+- **A session cookie for raw links.** Links to `/dav/files/…` opened in a new
   tab carry no header. After sign-in the app calls `POST /api/nexus/session`,
   which sets `nexus_session` (the same token; `HttpOnly`, `Secure`,
-  `SameSite=Lax`, `Path=/files/`, expiring with the token). `/files` accepts
+  `SameSite=Lax`, `Path=/dav/files/`, expiring with the token). `/dav/files` accepts
   the cookie **only for `GET` and `HEAD`**; writes need the header or an App
   Password. Signing out calls `DELETE /api/nexus/session`.
 - User tokens last 5 days (the `users` auth token setting). PocketBase can't
@@ -155,9 +155,9 @@ encryption stay in `internal/storage`:
 - Create folders; rename, move, copy and delete (with multi-select);
   upload files by picking or dropping them. Uploads are one `PUT` per file,
   with progress; there are no resumable or folder uploads yet.
-- Download a file; "copy raw link" and "open raw" use `/files/…`; "share"
+- Download a file; "copy raw link" and "open raw" use `/dav/files/…`; "share"
   creates a share link (§6.3).
-- It talks WebDAV to `/files` with the dashboard token: `PROPFIND Depth 1`
+- It talks WebDAV to `/dav/files` with the dashboard token: `PROPFIND Depth 1`
   to list, `PUT`, `MKCOL`, `MOVE`, `COPY`, `DELETE`. All existing checks
   (read-only mounts, the top level, cross-mount moves) apply unchanged.
 
@@ -185,7 +185,7 @@ encryption stay in `internal/storage`:
 
 ### 6.3 Raw files
 
-Changes to `GET` and `HEAD` on `/files`:
+Changes to `GET` and `HEAD` on `/dav/files`:
 
 - **Content types:** the image adds Alpine's `mailcap` package, so Go's
   `mime` package reads the full `/etc/mime.types` table instead of its
@@ -267,8 +267,8 @@ internal/shares/     the shares collection hooks and /s/ serving
 - **Dockerfile:** a `node` stage on `$BUILDPLATFORM` runs `npm ci && npm
   run build`; the Go stage copies `internal/web/dist` in before `go build`. The
   output is plain JavaScript, so no emulation is involved.
-- **Development:** `npm run dev` in `web/` (Vite on :5173, proxying `/api`,
-  `/files` and `/dav` to Nexus on :8090). After changing the API, run
+- **Development:** `npm run dev` in `web/` (Vite on :5173, proxying `/api`
+  and `/dav` to Nexus on :8090). After changing the API, run
   `UPDATE_OPENAPI=1 go test ./internal/account` to refresh
   `api/openapi.json`; a test fails while it is stale. Without a build, the Go binary
   serves a placeholder page, so `go test` and `go run` need no Node.
@@ -280,7 +280,7 @@ internal/shares/     the shares collection hooks and /s/ serving
 
 ## 8. Testing
 
-- **Go tests** for every server rule: Bearer and cookie on `/files` (the
+- **Go tests** for every server rule: Bearer and cookie on `/dav/files` (the
   cookie refused for writes), content types and the
   sandbox header, the new APIs (each refusing other users' records), and
   share serving: expiry, password and cookie, path confinement, `index.html`,
@@ -297,8 +297,8 @@ Each step is usable on its own; the riskiest comes last.
 1. The app shell, sign-in and the user dashboard, replacing the old `/account` page.
    **Built** (without share links, which come with step 4).
 2. The admin dashboard. **Built.**
-3. Raw-file changes (§6.3), the Bearer token and cookie on `/files`, and the
-   file browser with Monaco. **Built.**
+3. Raw-file changes (§6.3), the Bearer token and cookie on `/dav/files`, and
+   the Files page with Monaco. **Built.**
 4. Share links.
 
 ## 10. Open questions

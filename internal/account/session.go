@@ -24,7 +24,7 @@ func (h *handlers) registerSession(api huma.API) {
 	huma.Register(api, huma.Operation{
 		OperationID: "create-session", Method: http.MethodPost, Path: "/session", Tags: []string{"user"},
 		Summary:       "Set the cookie that lets raw file links open in a new tab",
-		Description:   "The cookie holds this request's token, is limited to /files/, and expires with the token. /files accepts it for GET and HEAD only.",
+		Description:   "The cookie holds this request's token, is limited to /dav/files/, and expires with the token. /dav/files accepts it for GET and HEAD only.",
 		DefaultStatus: http.StatusNoContent,
 	}, func(ctx context.Context, _ *struct{}) (*sessionOutput, error) {
 		c := from(ctx)

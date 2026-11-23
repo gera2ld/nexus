@@ -130,8 +130,10 @@ didn't block the same client through another; with it, they did.
    region, endpoint and keys); Browse checks that it connects. Then Mounts →
    New mount gives a user a folder of it. Users connect to the address the
    dashboard shows,
-   `https://dav.example.com/files/{id}/`, with an App Password that has
-   Files access. Local-disk mounts use paths under `/files`.
+   `https://dav.example.com/dav/files/{id}/`, with an App Password that has
+   Files access, or browse them on the Files page
+   (`https://dav.example.com/files`). Local-disk mounts use paths under
+   `/files` in the container.
 
 ## 7. Backups and restore
 

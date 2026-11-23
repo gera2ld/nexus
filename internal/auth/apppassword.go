@@ -67,11 +67,20 @@ func HashSecret(secret string) string {
 	return hex.EncodeToString(sum[:])
 }
 
-// RequiredScopes returns the scopes that grant access to a /dav or /files
-// path; any one of them suffices.
+// FilesPrefix is where the WebDAV file spaces live: /dav/files/{uid}/….
+const FilesPrefix = "/dav/files"
+
+// IsFilesPath reports whether p is /dav/files or below it.
+func IsFilesPath(p string) bool {
+	rest, ok := strings.CutPrefix(p, FilesPrefix)
+	return ok && (rest == "" || rest[0] == '/')
+}
+
+// RequiredScopes returns the scopes that grant access to a /dav path; any
+// one of them suffices.
 func RequiredScopes(p string) []string {
 	switch {
-	case strings.HasPrefix(p, "/files/"):
+	case IsFilesPath(p):
 		return []string{ScopeFiles}
 	case strings.HasPrefix(p, "/dav/"):
 		segs := strings.Split(strings.Trim(p, "/"), "/") // dav, uid, seg, ...
@@ -126,7 +135,7 @@ func (a *AppPassword) Wrap(next http.Handler) http.Handler {
 			return
 		}
 
-		if strings.HasPrefix(r.URL.Path, "/files/") {
+		if IsFilesPath(r.URL.Path) {
 			if user, via, tried := a.dashboardUser(r); user != nil {
 				setMeta(ctx, "user", user.Email())
 				setMeta(ctx, "signin", SignInOK)
@@ -185,7 +194,7 @@ func (a *AppPassword) Wrap(next http.Handler) http.Handler {
 // a new tab, which send no Authorization header (docs/WEB.md §3).
 const SessionCookie = "nexus_session"
 
-// dashboardUser accepts the web app's PocketBase user token on /files: as
+// dashboardUser accepts the web app's PocketBase user token on /dav/files: as
 // a Bearer header for any method, or as the session cookie for GET and HEAD
 // only, so a link on another site can't make the browser write. tried is
 // true when a Bearer header was sent but isn't valid; a bad cookie is

@@ -1,5 +1,5 @@
 // Package web serves the web app built from web/ (npm run build writes it
-// to dist). Every app path (/, /account/…, /admin and /browser) gets
+// to dist). Every app path (/, /account/…, /admin and /files) gets
 // index.html and React Router takes over, showing its own "Not found" for
 // unknown pages; /ui/ serves the built assets.
 package web
@@ -18,8 +18,8 @@ import (
 var dist embed.FS
 
 // csp allows only the app's own scripts and calls. Tailwind, Radix and
-// Monaco set inline styles, so styles may be inline; Monaco runs its
-// language services in workers. Previews load raw files from /files (and
+// Monaco set inline styles, so styles may be inline; Monaco runs a
+// worker. Previews load raw files from /dav/files (and
 // blob: URLs) into img, video, audio and iframe elements.
 const csp = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; " +
 	"img-src 'self' data: blob:; media-src 'self' blob:; frame-src 'self' blob:; worker-src 'self' blob:; " +
@@ -56,8 +56,8 @@ func Register(r *router.Router[*core.RequestEvent]) {
 	r.GET("/account", serve(http.StatusNotFound))
 	r.GET("/admin", page)
 	r.GET("/admin/{path...}", page)
-	r.GET("/browser", page)
-	r.GET("/browser/{path...}", page)
+	r.GET("/files", page)
+	r.GET("/files/{path...}", page)
 
 	assets := http.StripPrefix("/ui/", http.FileServerFS(files))
 	r.GET("/ui/{path...}", func(e *core.RequestEvent) error {

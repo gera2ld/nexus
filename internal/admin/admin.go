@@ -303,7 +303,7 @@ type AdminMount struct {
 	ID         string     `json:"id"`
 	User       AdminUser  `json:"user"`
 	Account    AccountRef `json:"account"`
-	Name       string     `json:"name" doc:"The folder name under /files/{user}/"`
+	Name       string     `json:"name" doc:"The folder name under /dav/files/{user}/"`
 	RemotePath string     `json:"remotePath"`
 	ReadOnly   bool       `json:"readOnly"`
 }

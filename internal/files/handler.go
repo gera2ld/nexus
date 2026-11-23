@@ -1,4 +1,4 @@
-// Package files serves each user's mounts over WebDAV at /files/{uid}/
+// Package files serves each user's mounts over WebDAV at /dav/files/{uid}/
 // (docs/ARCHITECTURE.md §7). It uses golang.org/x/net/webdav on top of the
 // rclone VFS from internal/storage, with in-memory locks per user.
 package files
@@ -25,7 +25,7 @@ import (
 )
 
 // Prefix is where file spaces are mounted.
-const Prefix = "/files"
+const Prefix = auth.FilesPrefix
 
 type xmlName = xml.Name
 
@@ -75,13 +75,13 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
-	rest, ok := strings.CutPrefix(r.URL.Path, Prefix+"/")
-	if !ok {
+	if !auth.IsFilesPath(r.URL.Path) {
 		http.NotFound(w, r)
 		return
 	}
+	rest := strings.TrimPrefix(strings.TrimPrefix(r.URL.Path, Prefix), "/")
 	if rest == "" {
-		// Clients configured with just /files/ land in their own space.
+		// Clients configured with just /dav/files/ land in their own space.
 		http.Redirect(w, r, Prefix+"/"+uid+"/", http.StatusMovedPermanently)
 		return
 	}

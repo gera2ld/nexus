@@ -254,12 +254,12 @@ func TestAppPasswordPaths(t *testing.T) {
 	creds := basic("ada@example.com", pw.Secret)
 
 	for path, want := range map[string]int{
-		home:                             http.StatusMultiStatus, // discovery
-		home + "calendars/":              http.StatusMultiStatus, // home listing
-		cal:                              http.StatusMultiStatus,
-		home + "calendars/work/":         http.StatusForbidden,
-		home + "contacts/contacts/":      http.StatusForbidden,
-		"/files/" + u.Id + "/docs/a.txt": http.StatusForbidden,
+		home:                                 http.StatusMultiStatus, // discovery
+		home + "calendars/":                  http.StatusMultiStatus, // home listing
+		cal:                                  http.StatusMultiStatus,
+		home + "calendars/work/":             http.StatusForbidden,
+		home + "contacts/contacts/":          http.StatusForbidden,
+		"/dav/files/" + u.Id + "/docs/a.txt": http.StatusForbidden,
 	} {
 		if got := s.propfind(path, creds); got != want {
 			t.Errorf("propfind %s: got %d, want %d", path, got, want)
@@ -313,7 +313,7 @@ func TestAppPasswordPaths(t *testing.T) {
 
 func TestAppPasswordPathsFiles(t *testing.T) {
 	f := newFilesEnv(t)
-	restricted := f.server.newPasswordWithPaths(f.userTok, "docs only", []string{"/files/docs/"}, "files")
+	restricted := f.server.newPasswordWithPaths(f.userTok, "docs only", []string{"/dav/files/docs/"}, "files")
 	creds := basic("ada@example.com", restricted.Secret)
 
 	list := f.do("PROPFIND", f.base+"/", `<propfind xmlns="DAV:"><prop><displayname/></prop></propfind>`,
@@ -363,7 +363,7 @@ func TestAppPasswordPathsParentsOnlyDiscover(t *testing.T) {
 	os.WriteFile(filepath.Join(f.docs, "a", "b", "in.txt"), []byte("inside"), 0o644)
 	// Paths as a user would paste them from the account page, with their id.
 	pw := f.server.newPasswordWithPaths(f.userTok, "b only",
-		[]string{"/files/" + f.uid + "/docs/a/b/", "/files/scratch/"}, "files")
+		[]string{"/dav/files/" + f.uid + "/docs/a/b/", "/dav/files/scratch/"}, "files")
 	creds := basic("ada@example.com", pw.Secret)
 	depth := func(d string) func(*http.Request) {
 		return func(r *http.Request) { creds(r); r.Header.Set("Depth", d) }
@@ -594,7 +594,7 @@ func TestAccountPages(t *testing.T) {
 	if first.code != http.StatusOK || !strings.Contains(first.body, "<title>Nexus</title>") {
 		t.Fatalf("/: %d %s", first.code, first.body)
 	}
-	for _, p := range []string{"/account/calendars", "/account/app-passwords", "/admin", "/admin/mounts", "/browser", "/browser/", "/browser/u1/docs/a.txt"} {
+	for _, p := range []string{"/account/calendars", "/account/app-passwords", "/admin", "/admin/mounts", "/files", "/files/", "/files/u1/docs/a.txt"} {
 		r := s.do("GET", p, nil, nil)
 		if r.code != http.StatusOK || r.body != first.body {
 			t.Errorf("%s: %d, want the app page", p, r.code)

@@ -22,6 +22,6 @@ export default defineConfig({
   resolve: { alias: { "@": path.resolve(__dirname, "src") } },
   build: { outDir, emptyOutDir: true },
   server: {
-    proxy: { "/api": nexus, "/files": nexus, "/dav": nexus },
+    proxy: { "/api": nexus, "/dav": nexus },
   },
 });

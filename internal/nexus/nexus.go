@@ -4,7 +4,6 @@ package nexus
 import (
 	"net/http"
 	"os"
-	"strings"
 	"sync"
 	"time"
 
@@ -54,7 +53,10 @@ func Setup(app core.App) error {
 		if err := e.Next(); err != nil {
 			return err
 		}
-		return schema.Apply(e.App)
+		if err := schema.Apply(e.App); err != nil {
+			return err
+		}
+		return migratePasswordPaths(e.App)
 	})
 
 	app.OnRecordCreateExecute(schema.Users).BindFunc(createDefaultCollections)
@@ -82,14 +84,15 @@ func Setup(app core.App) error {
 	return nil
 }
 
-// newHandler is the authenticated handler for /dav and /files: App
+// newHandler is the authenticated handler for /dav (calendars, contacts and
+// /dav/files): App
 // Password auth (one rate limiter for both) around the CalDAV/CardDAV server
 // and the file server.
 func newHandler(app core.App, st *store.Store, mounts *storage.Manager) http.Handler {
 	cal := davserver.New(st)
 	fh := files.New(mounts, app.Logger())
 	inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if strings.HasPrefix(r.URL.Path, files.Prefix+"/") {
+		if auth.IsFilesPath(r.URL.Path) {
 			fh.ServeHTTP(w, r)
 			return
 		}
@@ -125,10 +128,6 @@ func RegisterRoutes(r *router.Router[*core.RequestEvent], dav http.Handler) {
 		}).Unbind(davUnbind...)
 	}
 
-	r.Any(files.Prefix, func(e *core.RequestEvent) error {
-		return e.Redirect(http.StatusMovedPermanently, files.Prefix+"/")
-	}).Unbind(davUnbind...)
-
 	var warnProxy sync.Once
 	serve := func(e *core.RequestEvent) error {
 		if e.Request.Header.Get("X-Forwarded-For") != "" && len(e.App.Settings().TrustedProxy.Headers) == 0 {
@@ -147,9 +146,28 @@ func RegisterRoutes(r *router.Router[*core.RequestEvent], dav http.Handler) {
 		dav.ServeHTTP(e.Response, e.Request.WithContext(ctx))
 		return nil
 	}
-	for _, prefix := range []string{"/dav", files.Prefix} {
-		g := r.Group(prefix)
-		g.Unbind(davUnbind...)
-		g.Any("/{path...}", serve)
+	g := r.Group("/dav")
+	g.Unbind(davUnbind...)
+	g.Any("/{path...}", serve)
+}
+
+// migratePasswordPaths rewrites App Password path limits stored before
+// files moved from /files to /dav/files (auth.MigratePaths).
+func migratePasswordPaths(app core.App) error {
+	recs, err := app.FindAllRecords(schema.AppPasswords)
+	if err != nil {
+		return err
 	}
+	for _, r := range recs {
+		paths, changed := auth.MigratePaths(r.GetStringSlice("paths"))
+		if !changed {
+			continue
+		}
+		r.Set("paths", paths)
+		if err := app.Save(r); err != nil {
+			return err
+		}
+		app.Logger().Info("nexus: moved App Password path limits to /dav/files", "id", r.Id, "paths", paths)
+	}
+	return nil
 }

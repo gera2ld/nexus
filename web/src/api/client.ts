@@ -13,7 +13,7 @@ type Problem = components["schemas"]["ErrorModel"];
 
 /**
  * Which PocketBase auth collection this page signs in to: /admin is for
- * superusers, everything else (/, /account and /browser) for users. The
+ * superusers, everything else (/, /account and /files) for users. The
  * two never share a token, and moving between them is a full page load.
  */
 export const realm: "users" | "_superusers" = location.pathname.startsWith("/admin") ? "_superusers" : "users";

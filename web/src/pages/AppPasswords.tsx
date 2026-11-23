@@ -230,7 +230,7 @@ function PasswordForm(props: {
               id="pw-paths"
               name="paths"
               defaultValue={props.initial.paths.join("\n")}
-              placeholder={"/dav/calendars/personal/\n/files/docs/"}
+              placeholder={"/dav/calendars/personal/\n/dav/files/docs/"}
               className="font-mono text-sm"
               rows={3}
             />

@@ -1,15 +1,16 @@
 import { onUnauthorized, token } from "./client";
 
 /**
- * A small WebDAV client for /files/{uid}/…, signed in with the dashboard
- * token (docs/WEB.md §6.1). Paths here are the part after /files/{uid}:
+ * A small WebDAV client for /dav/files/{uid}/…, signed in with the
+ * dashboard token (docs/WEB.md §6.1). Paths here are the part after
+ * /dav/files/{uid}:
  * "/" is the list of mounts, "/docs/" a folder, "/docs/a.txt" a file.
  * Folders end with a slash.
  */
 
 export type Entry = {
   name: string;
-  /** Path below /files/{uid}; folders end with "/". */
+  /** Path below /dav/files/{uid}; folders end with "/". */
   path: string;
   dir: boolean;
   size: number;
@@ -35,7 +36,7 @@ export function setUser(id: string) {
 
 /** The URL path of p, each segment escaped. */
 export function rawPath(p: string) {
-  return `/files/${uid}` + p.split("/").map(encodeURIComponent).join("/");
+  return `/dav/files/${uid}` + p.split("/").map(encodeURIComponent).join("/");
 }
 
 /** The absolute raw link, for "copy raw link" and MOVE/COPY destinations. */
@@ -66,7 +67,7 @@ const PROPS = `<?xml version="1.0" encoding="utf-8"?>
 /** Parses a PROPFIND multistatus into entries, by path. */
 export function parseMultistatus(xml: string): Entry[] {
   const doc = new DOMParser().parseFromString(xml, "application/xml");
-  const prefix = `/files/${uid}`;
+  const prefix = `/dav/files/${uid}`;
   const out: Entry[] = [];
   for (const res of Array.from(doc.getElementsByTagNameNS("DAV:", "response"))) {
     const href = res.getElementsByTagNameNS("DAV:", "href")[0]?.textContent ?? "";

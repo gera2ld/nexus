@@ -7,7 +7,7 @@
 #     ./scripts/probe.sh [base-url]
 #
 # PROBE_CAL and PROBE_BOOK pick other collections. Set PROBE_FILES_MOUNT to
-# an empty, writable mount to also check /files (the App Password needs
+# an empty, writable mount to also check /dav/files (the App Password needs
 # Files access). See docs/CLIENTS.md.
 set -u
 BASE=${1:-http://127.0.0.1:8090}
@@ -71,11 +71,11 @@ out=$(req -X PROPFIND -H 'Depth: 0' $BASE$BOOK --data "$COLLPROPS")
 check "address book has getctag" "$out" "<getctag xmlns=\"http://calendarserver.org/ns/\">https://nexus/ns/sync/1</getctag>"
 
 if [ -n "${PROBE_FILES_MOUNT:-}" ]; then
-  F=$BASE/files/$PUID/$PROBE_FILES_MOUNT
+  F=$BASE/dav/files/$PUID/$PROBE_FILES_MOUNT
   code() { curl -s -o /dev/null -w '%{http_code}' -u $AUTH "$@"; }
-  check "files: /files/ redirects to own space" "$(curl -s -o /dev/null -w '%{http_code} %header{location}' -u $AUTH -X PROPFIND $BASE/files/)" "301 /files/$PUID/"
-  out=$(req -X PROPFIND -H 'Depth: 1' $BASE/files/$PUID/)
-  check "files: root lists the mount" "$out" "/files/$PUID/$PROBE_FILES_MOUNT/"
+  check "files: /dav/files/ redirects to own space" "$(curl -s -o /dev/null -w '%{http_code} %header{location}' -u $AUTH -X PROPFIND $BASE/dav/files/)" "301 /dav/files/$PUID/"
+  out=$(req -X PROPFIND -H 'Depth: 1' $BASE/dav/files/$PUID/)
+  check "files: root lists the mount" "$out" "/dav/files/$PUID/$PROBE_FILES_MOUNT/"
   check "files: MKCOL" "$(code -X MKCOL $F/probe/)" 201
   check "files: PUT new -> 201" "$(code -T "$0" $F/probe/p.sh)" 201
   check "files: PUT overwrite -> 204" "$(code -T "$0" $F/probe/p.sh)" 204
@@ -86,7 +86,7 @@ if [ -n "${PROBE_FILES_MOUNT:-}" ]; then
   check "files: PUT on locked file -> 423" "$(code -T "$0" $F/probe/p.sh)" 423
   check "files: UNLOCK" "$(code -X UNLOCK -H "Lock-Token: $LT" $F/probe/p.sh)" 204
   check "files: MOVE" "$(code -X MOVE -H "Destination: $F/probe/q.sh" $F/probe/p.sh)" 201
-  check "files: top level is read-only" "$(code -X MKCOL $BASE/files/$PUID/new/)" 403
+  check "files: top level is read-only" "$(code -X MKCOL $BASE/dav/files/$PUID/new/)" 403
   check "files: DELETE dir" "$(code -X DELETE $F/probe/)" 204
 fi
 

@@ -17,8 +17,8 @@ export type NavItem = { to: string; label: string; icon: LucideIcon; end?: boole
 
 export function Layout({ title, nav, extra }: { title: string; nav: NavItem[]; extra?: React.ReactNode }) {
   const { signOut, account } = useAuth();
-  // The file browser and its editor use the width.
-  const width = useLocation().pathname.startsWith("/browser") ? "max-w-7xl" : "max-w-5xl";
+  // The Files page and its editor use the width.
+  const width = useLocation().pathname.startsWith("/files") ? "max-w-7xl" : "max-w-5xl";
   return (
     <div className="min-h-svh">
       <header className="border-b">

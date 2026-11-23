@@ -113,10 +113,10 @@ Full design: [WEB.md](WEB.md).
 - **Admin dashboard:** storage accounts with proper forms for local disk
   and S3 and a connection test; mounts per user. Users, logs and backups
   stay in the PocketBase admin UI.
-- **File browser** at `/browser/…`, mirroring the raw `/files/…` paths: a
+- **Files page** at `/files/…`, mirroring the raw `/dav/files/…` paths: a
   file tree, uploads, rename, move, copy and delete, previews, and every
   text file in a code editor (Monaco) with conflict detection on save.
-- **Raw links** (`/files/…`) open in a browser tab with the right content
+- **Raw links** (`/dav/files/…`) open in a browser tab with the right content
   type. They're sandboxed, so an HTML file's scripts don't run there.
 - **Share links** (`/s/{token}/…`) for a file or a folder, public or with a
   password, optionally expiring. A shared folder with an `index.html` is a

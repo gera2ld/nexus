@@ -14,14 +14,13 @@ own HTTP handlers for the three DAV protocols:
  Thunderbird ─┐       │                                                                     │
  DAVx⁵ ───────┼─HTTPS─┤  /_/ , /api/*            PocketBase admin UI + REST API             │
  Finder ──────┘       │  /.well-known/cal|carddav  → 301 /dav/                              │
-                      │  /dav/*    ─┐                                                       │
-                      │  /files/*  ─┤ DAV auth middleware (Basic + App Password, scopes)    │
+                      │  /dav/*    ─┐ DAV auth middleware (Basic + App Password, scopes)    │
                       │             ├─► DAV router ─┬─ principal  (webdav.ServePrincipal)   │
                       │             │               ├─ calendars/ (internal/dav/caldav) ─┐  │
                       │             │               └─ contacts/  (internal/dav/carddav) ┤  │
                       │             │                                                    ▼  │
                       │             │                        DAV store ──► SQLite (PocketBase)
-                      │             └─► file handler (x/net/webdav) ─► Storage Manager     │
+                      │             └─► /dav/files/: file handler (x/net/webdav) ─► Storage Manager
                       │                                                 └─► rclone vfs/fs.Fs ─► S3 / local
                       └─────────────────────────────────────────────────────────────────────┘
 ```
@@ -51,7 +50,7 @@ the old auth proxy goes away.
 /_/ , /api/*                              PocketBase (admin dashboard, REST API)
 / (GET), /account/*                      user dashboard (the web app's index.html)
 /admin, /admin/*                         admin dashboard (the same app)
-/browser, /browser/*                     file browser (the same app)
+/files, /files/*                         Files page (the same app)
 /ui/*                                     the web app's built assets
 /api/nexus/admin/*                        admin dashboard API (PocketBase superuser token)
 /api/nexus/*                              user dashboard API (PocketBase user token)
@@ -62,9 +61,9 @@ the old auth proxy goes away.
 /dav/{uid}/calendars/{cal}/{name}.ics     calendar object
 /dav/{uid}/contacts/                      addressbook-home-set
 /dav/{uid}/contacts/{book}/{name}.vcf     address object
-/files, /files/                           301 → /files/{uid}/ (the signed-in user)
-/files/{uid}/                             the user's mounts, as read-only folders
-/files/{uid}/{mount}/path/...             WebDAV files
+/dav/files, /dav/files/                   301 → /dav/files/{uid}/ (the signed-in user)
+/dav/files/{uid}/                         the user's mounts, as read-only folders
+/dav/files/{uid}/{mount}/path/...         WebDAV files
 ```
 
 Share links will add `/s/{token}/…`; see [WEB.md](WEB.md).
@@ -83,8 +82,10 @@ Share links will add `/s/{token}/…`; see [WEB.md](WEB.md).
   before any backend code runs.
 - Paths are cleaned (`path.Clean`), and any `..` segment is rejected.
 - **Mounting on PocketBase** (checked 2026-11-22 against PocketBase v0.42.3):
-  - `/dav` and `/files` are router groups, each with a catch-all
-    `Any("/{path...}")` route.
+  - `/dav` is a router group with a catch-all `Any("/{path...}")` route;
+    the handler sends `/dav/files…` to the file server and the rest to
+    the calendar and contact server. A user id is 15 characters, so it
+    can't be `files`.
   - Every method reaches the handler intact: OPTIONS, PROPFIND, PROPPATCH,
     REPORT, MKCOL, MKCALENDAR, COPY, MOVE, LOCK, UNLOCK, plus the ordinary
     HTTP methods. Method, path, `Depth`, `Authorization` and body all arrive
@@ -133,7 +134,7 @@ full on every start with `ImportCollectionsByMarshaledJSON(snapshot, true)`:
 | `contacts` | addressbook, href, uid, `vcf`, etag, fn, email, `seq` | |
 | `dav_changes` | collection, href, seq, deleted | Change log and deletion records for sync |
 | `storage_accounts` | name, type (`local` / `s3`), `options` (plain JSON), `secret_options` (write-only input), `secrets_enc` (hidden, AES-256-GCM) | Defined by the admin (§7) |
-| `mounts` | user, account, name, remote_path, read_only | `/files/{uid}/{name}`; unique per (user, name) |
+| `mounts` | user, account, name, remote_path, read_only | `/dav/files/{uid}/{name}`; unique per (user, name) |
 
 A default calendar ("Personal") and a default address book ("Contacts") are
 created when a user is created.
@@ -186,15 +187,15 @@ created when a user is created.
 - **DAV and file endpoints** use HTTP Basic: the account email plus an App
   Password. The account's own password is never accepted there; it only works
   for the dashboard and the admin UI.
-- **The web app on `/files`:** the file browser sends its PocketBase user
+- **The web app on `/dav/files`:** the Files page sends its PocketBase user
   token as `Authorization: Bearer`, which gives full access to the user's
   own files (like an App Password with the `files` scope and no path limit).
   A bad or expired token gets a 401 with a `Bearer` challenge, not `Basic`,
   so browsers don't pop up a password prompt. For raw links opened in a new
   tab, `POST /api/nexus/session` sets the same token as the `nexus_session`
-  cookie (`HttpOnly`, `SameSite=Lax`, `Path=/files/`, `Secure` over HTTPS,
-  expiring with the token), which `/files` accepts for `GET` and `HEAD`
-  only. Neither works on `/dav`.
+  cookie (`HttpOnly`, `SameSite=Lax`, `Path=/dav/files/`, `Secure` over
+  HTTPS, expiring with the token), which `/dav/files` accepts for `GET`
+  and `HEAD` only. Neither works on calendars or contacts.
 - **Email lookup is case-insensitive.** The `users` email unique index is
   `COLLATE NOCASE`, which PocketBase's `FindAuthRecordByEmail` and its
   password sign-in both honour. It also stops two accounts that differ only
@@ -208,17 +209,24 @@ created when a user is created.
   when it's created.
 - **Scopes:** each password carries any of `cal`, `card` and `files`. The
   middleware checks the scope against the path before running a handler:
-  `calendars/…` needs `cal`, `contacts/…` needs `card`, `/files/…` needs
+  `calendars/…` needs `cal`, `contacts/…` needs `card`, `/dav/files/…` needs
   `files`, and discovery (`/dav/`, `/dav/{uid}/`) accepts either `cal` or
   `card`. A wrong scope gets 403.
 - **Path restriction:** a password can optionally carry `paths`, a JSON list
-  of user-rooted prefixes with the service namespace, e.g.
-  `/dav/calendars/personal/` or `/files/docs/`. The API normalises every
-  entry to start and end with `/`, so siblings can't match by accident,
-  removes the user's own id (so addresses copied from the dashboard
-  work), and refuses anything outside `/dav/` or `/files/` (including
-  `..`). DAV entries stop at a calendar or address book, since discovery
-  on a collection would list objects the password may not read.
+  of user-rooted prefixes, e.g. `/dav/calendars/personal/` or
+  `/dav/files/docs/`. The API normalises every entry to start and end with
+  `/`, so siblings can't match by accident, removes the user's own id (so
+  addresses copied from the dashboard work), and refuses anything outside
+  `/dav/` (including `..`). Calendar and contact entries stop at a
+  calendar or address book, since discovery on a collection would list
+  objects the password may not read. `/dav/` is stored as its three parts
+  (`/dav/calendars/`, `/dav/contacts/`, `/dav/files/`), and a file rule
+  gives no discovery on the calendar and contact side.
+- **Moved from `/files`** (2026-11-23): files used to live at
+  `/files/{uid}/`. At startup, stored rules are rewritten: `/files/x/`
+  becomes `/dav/files/x/`, and `/dav/`, which then meant calendars and
+  contacts only, becomes those two. Clients set up with the old address
+  must be changed; `/files` is now the web app's page.
 - **What a restricted password may do:** anything inside a listed path.
   On a parent of one (the DAV principal and homes, a mount root, folders
   on the way down) only `OPTIONS` and `PROPFIND` with `Depth` 0 or 1, and
@@ -250,7 +258,7 @@ created when a user is created.
   App Passwords per user. Rate limiting of the account-password sign-in is
   PocketBase's own (its rate-limit settings), not ours.
 - **Isolation:** a user can only reach their own `/dav/{uid}` and
-  `/files/{uid}` trees. Public sharing and cross-user access control are out
+  `/dav/files/{uid}` trees. Public sharing and cross-user access control are out
   of scope.
 
 ## 7. File storage
@@ -293,8 +301,8 @@ add about 22 MB to the binary.
     errors.
   - Content types come from the backend (S3) or the extension; the default
     would read the start of every file during PROPFIND.
-- **URLs:** `/files/{uid}/` lists the user's mounts as read-only
-  directories; `/files/{uid}/{mount}/…` is the mount. `{uid}` must be the
+- **URLs:** `/dav/files/{uid}/` lists the user's mounts as read-only
+  directories; `/dav/files/{uid}/{mount}/…` is the mount. `{uid}` must be the
   signed-in user (403 otherwise), and the App Password needs the `files`
   scope (§6).
 - **Raw files** (`GET`/`HEAD`): `X-Content-Type-Options: nosniff`, text
@@ -371,7 +379,7 @@ rclone maintains and tests, so the first real S3 mount is the check.
   failed DAV sign-ins (§6).
 - **Logs:** one entry per request, in PocketBase's request log (admin UI →
   Logs). PocketBase records method, URL, status, duration and User-Agent;
-  for `/dav` and `/files` Nexus adds a `meta` object instead of writing a
+  for `/dav` (files included) Nexus adds a `meta` object instead of writing a
   second line (DAVx⁵ makes dozens of requests per sync):
   - `signin`: `ok`, `none` (no credentials; clients often try this first),
     `failed` (unknown email, wrong or revoked App Password), `blocked` (rate
@@ -454,7 +462,7 @@ internal/admin/  the admin dashboard's /api/nexus/admin API (storage accounts, m
 internal/web/    the embedded web app: /, /account and /admin pages, /ui assets
 web/             the web app's source (React, Vite)
 internal/storage/ storage accounts and mounts: secret encryption, save checks, rclone VFS manager
-internal/files/  /files WebDAV: per-user view of mounts over x/net/webdav, write checks, conditions
+internal/files/  /dav/files WebDAV: per-user view of mounts over x/net/webdav, write checks, conditions
 internal/principal/ authenticated user id in the request context
 scripts/probe.sh end-to-end check of a running server (curl)
 ```
@@ -471,5 +479,5 @@ Share links will add `internal/shares/`
 | S3 only, or any rclone backend from day one? | **Proposed:** any backend underneath, UI forms for S3 and local only (§7) |
 | Versioning and conflict behaviour for S3 files | **Proposed:** checked `If-Match`, last writer wins, documented (§7) |
 | Does PocketBase's router pass DAV methods through? | **Resolved** on v0.42.3: yes, once `pbRejectUnknownToken`, `pbCors`, `pbBodyLimit` and `pbLoadAuthToken` are unbound on DAV routes (§3) |
-| Does PocketBase's request log record DAV requests? | **Resolved** 2026-11-23: yes. `_logs` in `auxiliary.db` has method, URL, status and User-Agent for every `/dav` and `/files` request (it writes in batches, which is why the first check saw nothing). Nexus's own log lines still add the user and App Password label (§8) |
+| Does PocketBase's request log record DAV requests? | **Resolved** 2026-11-23: yes. `_logs` in `auxiliary.db` has method, URL, status and User-Agent for every `/dav` and file request (it writes in batches, which is why the first check saw nothing). Nexus's own log lines still add the user and App Password label (§8) |
 | Do PocketBase backups cover our collections and upload to S3? | **Resolved** 2026-11-23: they cover every collection, and restore is tested (§8). S3 upload is PocketBase's own feature and isn't tested separately |

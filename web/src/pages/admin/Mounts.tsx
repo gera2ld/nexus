@@ -32,7 +32,7 @@ export function Mounts() {
   const noAccounts = accounts.data.length === 0;
   return (
     <>
-      <PageHeader title="Mounts" description="Each mount is a folder a user sees under /files. Removing a mount leaves the files where they are.">
+      <PageHeader title="Mounts" description="Each mount is a folder a user sees in Files. Removing a mount leaves the files where they are.">
         <Button onClick={() => setCreating(true)} disabled={noAccounts}>
           <Plus /> New mount
         </Button>
@@ -123,7 +123,7 @@ function MountForm({ mount, onClose }: { mount?: AdminMount; onClose: () => void
           <form onSubmit={submit} className="grid gap-5">
             <DialogHeader>
               <DialogTitle>{mount ? `Edit ${mount.name}` : "New mount"}</DialogTitle>
-              <DialogDescription>{mount ? `For ${mount.user.email}.` : "The user sees it as a folder under /files."}</DialogDescription>
+              <DialogDescription>{mount ? `For ${mount.user.email}.` : "The user sees it as a folder in Files."}</DialogDescription>
             </DialogHeader>
             {!mount && (
               <div className="grid gap-2">

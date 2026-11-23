@@ -5,10 +5,10 @@ import { mountOf } from "@/api/dav";
 import { useAuth } from "@/lib/auth";
 import { useMe } from "@/hooks/queries";
 
-/** The app's address for a path below /files/{uid}: /browser/{uid}/…. */
-export function useBrowserLink() {
+/** The app's address for a path below /dav/files/{uid}: /files/{uid}/…. */
+export function useFilesLink() {
   const { account } = useAuth();
-  return (p: string) => `/browser/${account!.id}` + p.split("/").map(encodeURIComponent).join("/");
+  return (p: string) => `/files/${account!.id}` + p.split("/").map(encodeURIComponent).join("/");
 }
 
 /** Whether writes are refused at p: the top level and read-only mounts. */
@@ -21,7 +21,7 @@ export function useReadOnly(p: string) {
 
 /** Files › mount › folder › … for p; the last part isn't a link. */
 export function Crumbs({ path }: { path: string }) {
-  const link = useBrowserLink();
+  const link = useFilesLink();
   const parts = path.split("/").filter(Boolean);
   return (
     <nav aria-label="Folder" className="flex min-w-0 flex-wrap items-center gap-1 text-sm">

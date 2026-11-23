@@ -18,7 +18,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { copy } from "@/hooks/use-copy";
 import { formatSize, formatTime } from "@/lib/format";
-import { FolderView } from "./Browser";
+import { FolderView } from "./Files";
 import { Crumbs, useReadOnly } from "./common";
 
 const Editor = lazy(() => import("./Editor"));
@@ -43,7 +43,7 @@ function kindOf(e: Entry): Kind {
   return "unknown";
 }
 
-/** A file under /browser: a preview, the editor for text, or a download. */
+/** A file on the Files page: a preview, the editor for text, or a download. */
 export function FileView({ path }: { path: string }) {
   const st = useQuery({ queryKey: ["dav-stat", path], queryFn: () => stat(path), retry: false, gcTime: 0 });
   if (st.data?.dir) return <FolderView path={path + "/"} />;

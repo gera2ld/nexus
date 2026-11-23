@@ -36,7 +36,7 @@
             "type": "string"
           },
           "name": {
-            "description": "The folder name under /files/{user}/",
+            "description": "The folder name under /dav/files/{user}/",
             "type": "string"
           },
           "readOnly": {
@@ -390,7 +390,7 @@
             "type": "string"
           },
           "paths": {
-            "description": "Optional path limits, e.g. /dav/calendars/personal/ or /files/docs/",
+            "description": "Optional path limits, e.g. /dav/calendars/personal/ or /dav/files/docs/",
             "items": {
               "type": "string"
             },
@@ -2077,7 +2077,7 @@
         ]
       },
       "post": {
-        "description": "The cookie holds this request's token, is limited to /files/, and expires with the token. /files accepts it for GET and HEAD only.",
+        "description": "The cookie holds this request's token, is limited to /dav/files/, and expires with the token. /dav/files accepts it for GET and HEAD only.",
         "operationId": "create-session",
         "responses": {
           "204": {

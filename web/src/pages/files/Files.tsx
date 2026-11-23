@@ -42,15 +42,15 @@ import { copy } from "@/hooks/use-copy";
 import { useAuth } from "@/lib/auth";
 import { formatSize, formatTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { Crumbs, useBrowserLink, useReadOnly } from "./common";
+import { Crumbs, useFilesLink, useReadOnly } from "./common";
 import { FileView } from "./FileView";
 
 /**
- * /browser and /browser/{uid}/…: the signed-in user's files. Both /browser
- * and /browser/{uid}/ show the mounts; a path ending in / is a folder,
+ * /files and /files/{uid}/…: the signed-in user's files. Both /files and
+ * /files/{uid}/ show the mounts; a path ending in / is a folder,
  * anything else a file.
  */
-export function Browser() {
+export function Files() {
   const { account } = useAuth();
   const params = useParams();
   if (params.uid && params.uid !== account?.id) return <NotFound home="/" />;
@@ -74,7 +74,7 @@ export const useListing = (p: string, enabled = true) =>
 
 function Tree({ current }: { current: string }) {
   const top = useListing("/");
-  const link = useBrowserLink();
+  const link = useFilesLink();
   return (
     <nav aria-label="Mounts and folders" className="sticky top-4 text-sm">
       <Link to={link("/")} className={cn("block rounded-md px-2 py-1 font-medium hover:bg-accent", current === "/" && "bg-accent")}>
@@ -95,7 +95,7 @@ function TreeNode({ entry, current, depth }: { entry: Entry; current: string; de
   }, [onPath]);
   const q = useListing(entry.path, open);
   const dirs = q.data?.filter((e) => e.dir) ?? [];
-  const link = useBrowserLink();
+  const link = useFilesLink();
   const Icon = depth === 0 ? HardDrive : Folder;
   return (
     <li>
@@ -139,7 +139,7 @@ export function FolderView({ path }: { path: string }) {
   const q = useListing(path);
   const me = useMe();
   const qc = useQueryClient();
-  const link = useBrowserLink();
+  const link = useFilesLink();
   const top = path === "/";
   const readOnly = useReadOnly(path);
   const [selected, setSelected] = useState<Set<string>>(new Set());
