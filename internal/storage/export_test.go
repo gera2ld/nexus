@@ -6,7 +6,7 @@ import (
 )
 
 // Config exposes the merged rclone config for tests.
-func (m *Manager) Config(acc *core.Record) (configmap.Simple, error) { return m.config(acc) }
+func (m *Manager) Config(acc *core.Record) (configmap.Getter, error) { return m.config(acc) }
 
 // Cached reports how many mounts are open.
 func (m *Manager) Cached() int {

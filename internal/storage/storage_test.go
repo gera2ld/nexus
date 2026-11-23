@@ -12,6 +12,7 @@ import (
 
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
 	_ "ganigeorgiev.com/pocketbase/pocketbase/migrations"
+	"github.com/rclone/rclone/fs/config/configmap"
 
 	"nexus/internal/nexus"
 	"nexus/internal/schema"
@@ -143,7 +144,7 @@ func TestAccountOptionsAndSecrets(t *testing.T) {
 	}
 
 	acc := must[*core.Record](t)(e.account("s3", map[string]any{
-		"options":        map[string]any{"provider": "Minio", "endpoint": "http://127.0.0.1:9000", "force_path_style": true},
+		"options":        map[string]any{"provider": "Other", "endpoint": "http://127.0.0.1:9000", "force_path_style": true},
 		"secret_options": secrets,
 	}))
 	stored, _ := e.app.FindRecordById(schema.StorageAccounts, acc.Id)
@@ -154,17 +155,19 @@ func TestAccountOptionsAndSecrets(t *testing.T) {
 	if raw := string(jsonRaw(stored.Get("secret_options"))); raw != "" && raw != "null" {
 		t.Errorf("secret_options kept in plain text: %s", raw)
 	}
-	cm := must[map[string]string](t)(mapOf(e.m.Config(stored)))
-	want := map[string]string{"provider": "Minio", "endpoint": "http://127.0.0.1:9000", "force_path_style": "true",
-		"access_key_id": "AKIAEXAMPLE", "secret_access_key": "s3cr3t/value"}
+	cm := must[configmap.Getter](t)(e.m.Config(stored))
+	// Unset options get rclone's defaults: backends read every option from
+	// the map, and S3 refuses a zero chunk size.
+	want := map[string]string{"provider": "Other", "endpoint": "http://127.0.0.1:9000", "force_path_style": "true",
+		"access_key_id": "AKIAEXAMPLE", "secret_access_key": "s3cr3t/value", "chunk_size": "5Mi"}
 	for k, v := range want {
-		if cm[k] != v {
-			t.Errorf("config[%s] = %q, want %q", k, cm[k], v)
+		if got, _ := cm.Get(k); got != v {
+			t.Errorf("config[%s] = %q, want %q", k, got, v)
 		}
 	}
 
 	// Blank secret_options on update keeps the secrets.
-	stored.Set("options", map[string]any{"provider": "Minio", "region": "eu-1"})
+	stored.Set("options", map[string]any{"provider": "Other", "region": "eu-1"})
 	if err := e.app.Save(stored); err != nil {
 		t.Fatal(err)
 	}
@@ -331,8 +334,4 @@ func jsonRaw(v any) []byte {
 		return []byte(x.String())
 	}
 	return nil
-}
-
-func mapOf[M ~map[string]string](m M, err error) (map[string]string, error) {
-	return map[string]string(m), err
 }

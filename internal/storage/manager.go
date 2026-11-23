@@ -145,8 +145,24 @@ func (m *Manager) open(ctx context.Context, rec *core.Record) (*Mount, error) {
 	}, nil
 }
 
-// config merges an account's options and decrypted secrets for rclone.
-func (m *Manager) config(acc *core.Record) (configmap.Simple, error) {
+// optionDefaults gives rclone a backend's default for every option the
+// account doesn't set. Backends read their whole config from the map, so
+// without it every unset option is zero (S3 refuses a chunk size of 0).
+// Unlike rclone's own fs.ConfigMap, it doesn't read RCLONE_* environment
+// variables or a config file: an account's settings are all in Nexus.
+type optionDefaults map[string]*fs.Option
+
+func (d optionDefaults) Get(key string) (string, bool) {
+	o := d[key]
+	if o == nil {
+		return "", false
+	}
+	return o.String(), true
+}
+
+// config merges an account's options and decrypted secrets for rclone, over
+// the backend's defaults.
+func (m *Manager) config(acc *core.Record) (configmap.Mapper, error) {
 	opts, err := backendOptions(acc.GetString("type"))
 	if err != nil {
 		return nil, err
@@ -175,7 +191,10 @@ func (m *Manager) config(acc *core.Record) (configmap.Simple, error) {
 			cm[k] = v
 		}
 	}
-	return cm, nil
+	out := configmap.New()
+	out.AddGetter(cm, configmap.PriorityNormal)
+	out.AddGetter(optionDefaults(opts), configmap.PriorityDefault)
+	return out, nil
 }
 
 func (m *Manager) drop(match func(*Mount) bool) {
