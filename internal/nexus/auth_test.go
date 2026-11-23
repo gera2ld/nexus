@@ -45,11 +45,17 @@ func newServer(t *testing.T) *server {
 		s.logMeta, _ = e.Get(apis.RequestEventKeyLogMeta).(auth.LogMeta)
 		return err
 	})
-	mounts := storage.NewManager(app, nil)
+	// Setup bound a Manager with the key from the environment; this one
+	// uses the same key, so their save hooks agree.
+	sealer, err := storage.NewSealer(os.Getenv(storage.KeyEnv))
+	if err != nil {
+		t.Fatal(err)
+	}
+	mounts := storage.NewManager(app, sealer)
 	mounts.Bind(app)
 	t.Cleanup(mounts.Close)
 	st := store.New(app)
-	mount(r, app, newHandler(app, st, mounts), st)
+	mount(r, app, newHandler(app, st, mounts), st, mounts)
 	mux, err := r.BuildMux()
 	if err != nil {
 		t.Fatal(err)
@@ -588,7 +594,7 @@ func TestAccountPages(t *testing.T) {
 	if first.code != http.StatusOK || !strings.Contains(first.body, "<title>Nexus</title>") {
 		t.Fatalf("/account: %d %s", first.code, first.body)
 	}
-	for _, p := range []string{"/account/", "/account/calendars", "/account/app-passwords"} {
+	for _, p := range []string{"/account/", "/account/calendars", "/account/app-passwords", "/admin", "/admin/mounts"} {
 		r := s.do("GET", p, nil, nil)
 		if r.code != http.StatusOK || r.body != first.body {
 			t.Errorf("%s: %d, want the app page", p, r.code)

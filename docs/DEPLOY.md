@@ -125,10 +125,11 @@ didn't block the same client through another; with it, they did.
    App Password per device.
 3. Calendar and contacts apps: server `https://dav.example.com/`, the
    email, an App Password. Discovery finds the rest.
-4. Files: admin UI → `storage_accounts` (type `local` or `s3`; for S3,
-   options such as `{"provider": "AWS", "region": "eu-central-1"}` and the
-   keys in `secret_options`), then `mounts` to give a user a folder. Users
-   connect to the address the dashboard shows,
+4. Files: sign in at `https://dav.example.com/admin` as the superuser.
+   Storage → New storage account (local disk, or S3 with its provider,
+   region, endpoint and keys); Browse checks that it connects. Then Mounts →
+   New mount gives a user a folder of it. Users connect to the address the
+   dashboard shows,
    `https://dav.example.com/files/{id}/`, with an App Password that has
    Files access. Local-disk mounts use paths under `/files`.
 

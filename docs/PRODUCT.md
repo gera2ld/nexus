@@ -103,7 +103,7 @@ Nexus offers a minimal web interface for:
 
 There is no web calendar or contacts app in the initial release.
 
-### 3.5 Web app (user dashboard built; the rest designed)
+### 3.5 Web app (dashboards built; file browser and share links designed)
 
 Full design: [WEB.md](WEB.md).
 
@@ -164,7 +164,7 @@ on SQLite, App Passwords and the user dashboard, file mounts on local disk
 or S3 through rclone, request logs, backup and restore, and a Docker
 image. Thunderbird, rclone and Finder are checked; DAVx⁵ and Windows
 Explorer are still to check ([CLIENTS.md](CLIENTS.md)). Of the web app
-(§3.5), the user dashboard is built; the admin dashboard, file browser and
+(§3.5), the user and admin dashboards are built; the file browser and
 share links are designed.
 
 **v1 is done when** the Baïkal + rclone + auth-proxy setup can be switched

@@ -1,6 +1,6 @@
 # Nexus — Web UI design
 
-Status: the user dashboard is built (§9 step 1); the rest is design · 2026-11-23
+Status: the user and admin dashboards are built (§9 steps 1 and 2); the rest is design · 2026-11-23
 
 Nexus gets a web app with three parts: a user dashboard, an admin dashboard
 and a file browser with share links. It replaces the current `/account`
@@ -121,11 +121,26 @@ the admin UI, so its change log goes with it.
   path picker uses the same listing as the connection test.
 - Users, logs and backups stay in the PocketBase admin UI (`/_/`), linked
   from the dashboard.
+- **The settings form comes from rclone:** the account's main options for
+  the chosen S3 provider, with rclone's suggested values (regions,
+  endpoints), and every other option under "Advanced" by name. Options
+  rclone marks sensitive or passwords (including `access_key_id`) are
+  write-only: the dashboard shows only that they are stored.
+- Sign-in is a PocketBase superuser at `/admin`, kept apart from the user
+  sign-in at `/account` (each page load knows which from its URL).
 
-API: the PocketBase records API for `storage_accounts` and `mounts`
-(superuser only, as now), plus
-`POST /api/nexus/admin/storage-accounts/{id}/list` with an optional path
-for the connection test and the path picker.
+API (superuser token; all under `/api/nexus/admin`, in the same Huma API
+and OpenAPI document as the user dashboard). Saves go through the same
+record hooks as the PocketBase admin UI, so option checks and secret
+encryption stay in `internal/storage`:
+
+| Method and path | Does |
+|---|---|
+| `GET /storage-types/{type}/options` | rclone's options for `local` or `s3`: help, secret, advanced, provider filter, examples |
+| `GET, POST /storage-accounts` · `GET, PATCH, DELETE /storage-accounts/{id}` | manage accounts. Secrets are returned by name only; a PATCH merges them (an empty value removes one). Delete is refused (409) while a mount uses the account |
+| `POST /storage-accounts/{id}/browse` | list a folder (the top when the path is empty: `/` for local disk, the buckets for S3); the connection test and the path picker. Backend errors come back as 422 with rclone's message, without retries |
+| `GET /users` | users for the mount form |
+| `GET, POST /mounts` · `PATCH, DELETE /mounts/{id}` | manage mounts; a mount's user is fixed at creation |
 
 ## 6. Files
 
@@ -267,7 +282,7 @@ Each step is usable on its own; the riskiest comes last.
 
 1. The app shell, sign-in and the user dashboard, replacing `/account`.
    **Built** (without share links, which come with step 4).
-2. The admin dashboard.
+2. The admin dashboard. **Built.**
 3. Raw-file changes (§6.3), the Bearer token and cookie on `/files`, and the
    file browser with Monaco.
 4. Share links.

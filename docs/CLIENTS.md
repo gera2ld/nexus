@@ -62,10 +62,13 @@ read-only mount and the top level give "Operation not permitted".
   description, colour and component set. This is covered by tests but no
   real client has done it yet. Calendars hold events and tasks only; a
   request for journals alone is refused.
-- **Deleting collections** from a client is refused (403); the admin UI
-  deletes a calendar or address book and everything in it.
-- **S3** isn't tested separately: Nexus passes options straight to rclone's
-  s3 backend, which rclone maintains and tests.
+- **Deleting collections** from a client is refused (403); the user
+  dashboard deletes a calendar or address book and everything in it.
+- **S3** hasn't been checked against a real bucket yet. Nexus passes
+  options to rclone's s3 backend, which rclone maintains and tests. Until
+  2026-11-23 Nexus didn't pass rclone's defaults, so S3 accounts couldn't
+  open ("chunk size: 0 is less than 5Mi"); the admin dashboard's Browse
+  button is the quickest check after deploying.
 
 ## Checking a client
 

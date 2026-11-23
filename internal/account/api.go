@@ -21,8 +21,10 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humago"
 
+	"nexus/internal/admin"
 	"nexus/internal/auth"
 	"nexus/internal/schema"
+	"nexus/internal/storage"
 	"nexus/internal/store"
 )
 
@@ -51,38 +53,43 @@ type handlers struct {
 	st  *store.Store
 }
 
-// NewAPI builds the Huma API. The returned handler serves every path under
-// Prefix and expects the signed-in user from serve.
-func NewAPI(app core.App, st *store.Store) (huma.API, *http.ServeMux) {
+// NewAPI builds the Huma API: the user dashboard's operations and the
+// admin dashboard's (internal/admin). The returned handler serves every
+// path under Prefix and expects the signed-in user from serve.
+func NewAPI(app core.App, st *store.Store, mgr *storage.Manager) (huma.API, *http.ServeMux) {
 	mux := http.NewServeMux()
 	cfg := huma.DefaultConfig("Nexus API", "1")
-	cfg.Info.Description = "The user dashboard's API. Sign in with PocketBase " +
-		"(users auth-with-password) and send the token as a Bearer header."
+	cfg.Info.Description = "The dashboards' API. Sign in with PocketBase (users " +
+		"auth-with-password, or _superusers for /admin) and send the token as a Bearer header."
 	cfg.DocsPath = "" // no docs UI: it would load scripts from a CDN
 	cfg.Servers = []*huma.Server{{URL: Prefix}}
 	cfg.Components.SecuritySchemes = map[string]*huma.SecurityScheme{
-		"bearer": {Type: "http", Scheme: "bearer", Description: "PocketBase user token"},
+		"bearer":    {Type: "http", Scheme: "bearer", Description: "PocketBase user token"},
+		"superuser": {Type: "http", Scheme: "bearer", Description: "PocketBase superuser token"},
 	}
 	cfg.Security = []map[string][]string{{"bearer": {}}}
 	api := humago.NewWithPrefix(mux, Prefix, cfg)
 	h := &handlers{app: app, st: st}
 	h.registerUser(api)
 	h.registerCollections(api)
+	admin.Register(api, app, mgr)
 	return api, mux
 }
 
 // Register mounts the API on r.
-func Register(r *router.Router[*core.RequestEvent], app core.App, st *store.Store) {
-	_, mux := NewAPI(app, st)
+func Register(r *router.Router[*core.RequestEvent], app core.App, st *store.Store, mgr *storage.Manager) {
+	_, mux := NewAPI(app, st, mgr)
 	serve := func(e *core.RequestEvent) error {
 		ctx := context.WithValue(e.Request.Context(), ctxKey{}, caller{user: e.Auth, req: e.Request})
 		mux.ServeHTTP(e.Response, e.Request.WithContext(ctx))
 		return nil
 	}
-	// The OpenAPI document is public; everything else needs a user.
+	// The OpenAPI document is public; /admin needs a superuser and
+	// everything else a user. Neither token works on the other's routes.
 	r.GET(Prefix+"/openapi.json", serve)
 	r.GET(Prefix+"/openapi.yaml", serve)
 	r.GET(Prefix+"/schemas/{path...}", serve)
+	r.Any(Prefix+"/admin/{path...}", serve).Bind(apis.RequireSuperuserAuth())
 	r.Any(Prefix+"/{path...}", serve).Bind(apis.RequireAuth(schema.Users))
 }
 

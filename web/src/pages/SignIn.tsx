@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from "react";
+import { realm } from "@/api/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -28,9 +29,11 @@ export function SignIn() {
     <main className="flex min-h-svh items-center justify-center p-4">
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <CardTitle className="text-xl">Sign in to Nexus</CardTitle>
+          <CardTitle className="text-xl">{realm === "users" ? "Sign in to Nexus" : "Nexus admin"}</CardTitle>
           <CardDescription>
-            Use your account password here. Calendar, contacts and file apps use App Passwords instead.
+            {realm === "users"
+              ? "Use your account password here. Calendar, contacts and file apps use App Passwords instead."
+              : "Sign in as a superuser, the same account as the PocketBase admin UI."}
           </CardDescription>
         </CardHeader>
         <CardContent>

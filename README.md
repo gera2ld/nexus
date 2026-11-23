@@ -11,7 +11,9 @@ them.
 - **App Passwords:** each device gets its own password, limited to
   calendars, contacts or files, and revocable at any time. Users manage
   them on their dashboard.
-- **Admin UI, logs and backups** from [PocketBase](https://pocketbase.io).
+- **Admin dashboard** at `/admin` for storage accounts (local disk, S3)
+  and mounts; users, logs and backups in [PocketBase](https://pocketbase.io)'s
+  admin UI.
 
 ## Get started
 
@@ -20,7 +22,9 @@ them.
    Caddy, backups and logs.
 2. In the admin UI at `https://dav.example.com/_/`, create a user. There is
    no public sign-up.
-3. The user signs in at `https://dav.example.com/account` and creates an
+3. For files, add storage and give the user a mount at
+   `https://dav.example.com/admin`.
+4. The user signs in at `https://dav.example.com/account` and creates an
    App Password for each device.
 
 ## Connect your apps
@@ -45,7 +49,7 @@ app.
 ## Limits
 
 - Apps can create calendars and address books, but not delete them;
-  deleting one (and everything in it) is done in the admin UI.
+  deleting one (and everything in it) is done in the user dashboard.
 - File modification times set by apps aren't stored.
 
 ## Development

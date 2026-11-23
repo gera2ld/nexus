@@ -1,6 +1,6 @@
 // Package web serves the web app built from web/ (npm run build writes it
-// to dist). Every app path gets index.html and React Router takes over;
-// /ui/ serves the built assets.
+// to dist). Every app path (/account and /admin) gets index.html and React
+// Router takes over; /ui/ serves the built assets.
 package web
 
 import (
@@ -40,8 +40,10 @@ func Register(r *router.Router[*core.RequestEvent]) {
 		h.Set("Referrer-Policy", "same-origin")
 		return e.HTML(http.StatusOK, string(index))
 	}
-	r.GET("/account", page)
-	r.GET("/account/{path...}", page)
+	for _, p := range []string{"/account", "/admin"} {
+		r.GET(p, page)
+		r.GET(p+"/{path...}", page)
+	}
 
 	assets := http.StripPrefix("/ui/", http.FileServerFS(files))
 	r.GET("/ui/{path...}", func(e *core.RequestEvent) error {

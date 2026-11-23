@@ -42,7 +42,7 @@ the old auth proxy goes away.
 | iCalendar / vCard | `emersion/go-ical`, `emersion/go-vcard` | |
 | Calendar and contact data | Raw ICS / VCF text in SQLite, plus indexed fields | |
 | File contents | rclone backend | Never in SQLite |
-| Admin UI | PocketBase dashboard, plus the web app's user dashboard | |
+| Admin UI | The web app's admin dashboard (storage and mounts) and PocketBase's (users, logs, backups) | |
 | Deployment | One Docker container, plus persistent data and config volumes | |
 
 ## 3. HTTP surface
@@ -50,8 +50,10 @@ the old auth proxy goes away.
 ```
 /_/ , /api/*                              PocketBase (admin dashboard, REST API)
 /account, /account/*                     user dashboard (the web app's index.html)
+/admin, /admin/*                         admin dashboard (the same app)
 /ui/*                                     the web app's built assets
-/api/nexus/*                              dashboard API (PocketBase user token)
+/api/nexus/admin/*                        admin dashboard API (PocketBase superuser token)
+/api/nexus/*                              user dashboard API (PocketBase user token)
 /.well-known/caldav, /.well-known/carddav 301 → /dav/
 /dav/                                     current-user-principal discovery
 /dav/{uid}/                               principal (advertises both home sets)
@@ -64,8 +66,8 @@ the old auth proxy goes away.
 /files/{uid}/{mount}/path/...             WebDAV files
 ```
 
-The web app adds `/account/…`, `/admin/…`, `/browser/…` and share links at
-`/s/{token}/…`; see [WEB.md](WEB.md) (designed, not built).
+The file browser and share links will add `/browser/…` and `/s/{token}/…`;
+see [WEB.md](WEB.md).
 
 - go-webdav works out what a path is from how deep it is under `/dav`:
   principal, then home set, then collection, then object. That fixes this
@@ -174,9 +176,9 @@ created when a user is created.
   components. Recurring events (RRULE or RDATE) get an open end, so the
   database prefilter never drops an occurrence. Tasks without dates are
   always passed on to the exact matcher.
-- **Deleting a whole collection** from a client is refused (403); the admin UI
-  does it. Deleting a calendar or address book also deletes its `dav_changes`
-  rows, via a hook.
+- **Deleting a whole collection** from a client is refused (403); the user
+  dashboard does it. Deleting a calendar or address book also deletes its
+  `dav_changes` rows, via a hook.
 - **Pruning** runs daily from PocketBase's cron (`nexusPruneChanges`, 03:17).
 
 ## 6. Authentication and authorization
@@ -310,7 +312,10 @@ add about 22 MB to the binary.
   directory for `local`, `bucket/prefix` for `s3`), `read_only`.
 - **Storage manager** (`internal/storage`): maps (user, mount name) to a
   cached `vfs.VFS` built from the account's type, options and decrypted
-  secrets, rooted at `remote_path`. Saving or deleting a mount or account
+  secrets, rooted at `remote_path`. Options the account doesn't set get
+  rclone's defaults (backends read every option from the config, and S3
+  refuses a zero chunk size); unlike rclone's own config, no `RCLONE_*`
+  environment variables or config file are read. Saving or deleting a mount or account
   drops the affected cache entries and shuts their VFS down.
 - **VFS settings:** cache mode off (writes stream straight to the backend,
   as in `rclone serve webdav`'s default), directory cache 1 minute, so
@@ -411,7 +416,7 @@ rclone maintains and tests, so the first real S3 mount is the check.
   create calendars and address books in the user's home, keeping the
   name, description, colour and component set. Slugs come from the URL,
   so they allow upper case and dots (Apple-style UUIDs). Clients can't
-  delete collections; the admin UI does.
+  delete collections; the user dashboard does.
 
 ## 10. Repository layout
 
@@ -424,8 +429,9 @@ internal/schema/ embedded collections snapshot (collections.json) + Apply
 internal/store/  CalDAV/CardDAV backends on PocketBase collections; shared write path and sync
 internal/davserver/ /dav router: principal, calendars/, contacts/; per-user tree check
 internal/auth/   App Password auth for DAV: secrets, scopes, failed-sign-in limiter
-internal/account/ the dashboard's /api/nexus API (Huma; generates api/openapi.json)
-internal/web/    the embedded web app: /dashboards and /ui assets
+internal/account/ the user dashboard's /api/nexus API (Huma; generates api/openapi.json)
+internal/admin/  the admin dashboard's /api/nexus/admin API (storage accounts, mounts)
+internal/web/    the embedded web app: /account and /admin pages, /ui assets
 web/             the web app's source (React, Vite)
 internal/storage/ storage accounts and mounts: secret encryption, save checks, rclone VFS manager
 internal/files/  /files WebDAV: per-user view of mounts over x/net/webdav, write checks, conditions

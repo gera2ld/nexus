@@ -13,7 +13,7 @@ const specFile = "../../api/openapi.json"
 // types are generated from, in step with the handlers. Regenerate with
 // UPDATE_OPENAPI=1 go test ./internal/account.
 func TestOpenAPISpecIsCurrent(t *testing.T) {
-	api, _ := NewAPI(nil, nil)
+	api, _ := NewAPI(nil, nil, nil)
 	got, err := json.MarshalIndent(api.OpenAPI(), "", "  ")
 	if err != nil {
 		t.Fatal(err)

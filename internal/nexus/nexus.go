@@ -76,7 +76,7 @@ func Setup(app core.App) error {
 	})
 
 	app.OnServe().BindFunc(func(se *core.ServeEvent) error {
-		mount(se.Router, app, dav, st)
+		mount(se.Router, app, dav, st, mounts)
 		return se.Next()
 	})
 	return nil
@@ -100,9 +100,9 @@ func newHandler(app core.App, st *store.Store, mounts *storage.Manager) http.Han
 }
 
 // mount registers every Nexus route.
-func mount(r *router.Router[*core.RequestEvent], app core.App, dav http.Handler, st *store.Store) {
+func mount(r *router.Router[*core.RequestEvent], app core.App, dav http.Handler, st *store.Store, mounts *storage.Manager) {
 	RegisterRoutes(r, dav)
-	account.Register(r, app, st)
+	account.Register(r, app, st, mounts)
 	web.Register(r)
 }
 

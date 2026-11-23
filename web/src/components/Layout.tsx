@@ -1,25 +1,18 @@
-import { CalendarDays, Contact, House, KeyRound, LogOut } from "lucide-react";
+import { LogOut, type LucideIcon } from "lucide-react";
 import { NavLink, Outlet } from "react-router";
 import { Button } from "@/components/ui/button";
-import { useMe } from "@/hooks/queries";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
-const nav = [
-  { to: "/account", label: "Overview", icon: House, end: true },
-  { to: "/account/app-passwords", label: "App Passwords", icon: KeyRound },
-  { to: "/account/calendars", label: "Calendars", icon: CalendarDays },
-  { to: "/account/contacts", label: "Contacts", icon: Contact },
-];
+export type NavItem = { to: string; label: string; icon: LucideIcon; end?: boolean };
 
-export function Layout() {
-  const { signOut } = useAuth();
-  const me = useMe();
+export function Layout({ title, nav, extra }: { title: string; nav: NavItem[]; extra?: React.ReactNode }) {
+  const { signOut, email } = useAuth();
   return (
     <div className="min-h-svh">
       <header className="border-b">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
-          <span className="font-semibold">Nexus</span>
+          <span className="font-semibold">{title}</span>
           <nav className="flex flex-wrap gap-1">
             {nav.map(({ to, label, icon: Icon, end }) => (
               <NavLink
@@ -39,7 +32,8 @@ export function Layout() {
             ))}
           </nav>
           <div className="ml-auto flex items-center gap-2 text-sm text-muted-foreground">
-            <span className="hidden sm:inline">{me.data?.email}</span>
+            {extra}
+            <span className="hidden sm:inline">{email}</span>
             <Button variant="ghost" size="sm" onClick={signOut}>
               <LogOut /> Sign out
             </Button>
