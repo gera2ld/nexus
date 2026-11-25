@@ -1,9 +1,11 @@
-# Builds the container image on demand and pushes it to GitHub Container
-# Registry as ghcr.io/<owner>/<repo>. Run it from Actions → Image → Run
-# workflow. See docs/DEPLOY.md.
 name: Image
 
 on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
   workflow_dispatch:
 
 permissions:
@@ -37,7 +39,6 @@ jobs:
           images: ghcr.io/${{ github.repository }}
           tags: |
             type=raw,value=latest
-            type=sha
 
       - uses: docker/build-push-action@v7
         with:

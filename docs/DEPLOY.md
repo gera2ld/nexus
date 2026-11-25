@@ -12,11 +12,10 @@ The image is published on GitHub Container Registry for amd64 and arm64:
 docker pull ghcr.io/gera2ld/nexus:latest
 ```
 
-Each build is also tagged `sha-<commit>`, for pinning a version. Builds are
-made by the Image workflow (**Actions → Image → Run workflow**) and are not
-automatic, so `latest` is the last time it ran. If the package is private,
-the server needs `docker login ghcr.io` with a token that can read packages
-first.
+The Image workflow builds on every push to `main` that changes more than
+docs, so `latest` follows `main`; **Actions → Image → Run workflow** builds
+by hand. If the package is private, the server needs `docker login
+ghcr.io` with a token that can read packages first.
 
 To build it yourself instead:
 
