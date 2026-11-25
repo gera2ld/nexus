@@ -15,6 +15,7 @@ require (
 
 require (
 	ganigeorgiev.com/fexpr v0.7.0 // indirect
+	github.com/Azure/go-ntlmssp v0.1.1 // indirect
 	github.com/IBM/go-sdk-core/v5 v5.25.1 // indirect
 	github.com/Max-Sum/base32768 v0.0.0-20230304063302-18e6ce5945fd // indirect
 	github.com/adrg/xdg v0.5.3 // indirect

@@ -19,6 +19,11 @@ import (
 // isSecret reports whether rclone treats an option as a secret.
 func isSecret(o *fs.Option) bool { return o.IsPassword || o.Sensitive }
 
+// isCommand reports whether an option names a program for rclone to run
+// (WebDAV's bearer_token_command). Storage settings must not run commands
+// on the server, so these are refused and not offered.
+func isCommand(name string) bool { return strings.HasSuffix(name, "_command") }
+
 func backendOptions(typ string) (map[string]*fs.Option, error) {
 	ri, err := fs.Find(typ)
 	if err != nil {
@@ -71,6 +76,8 @@ func checkKeys(opts map[string]*fs.Option, values map[string]string, secret bool
 		switch {
 		case !ok:
 			return fmt.Errorf("unknown option %q", k)
+		case isCommand(k):
+			return fmt.Errorf("%q runs a command on the server and isn't allowed", k)
 		case secret && !isSecret(o):
 			return fmt.Errorf("%q is not a secret; put it in options", k)
 		case !secret && isSecret(o):
@@ -152,6 +159,11 @@ func checkRemotePath(typ, p string) error {
 		// Empty is the account's whole bucket list.
 		if strings.HasPrefix(p, "/") || (p != "" && path.Clean(p) == ".") {
 			return fmt.Errorf("must be bucket or bucket/prefix with no leading /, or empty for all buckets")
+		}
+	case "webdav":
+		// Relative to the account's URL; empty is the URL itself.
+		if strings.HasPrefix(p, "/") || (p != "" && path.Clean(p) == ".") {
+			return fmt.Errorf("must be a folder under the server URL with no leading /, or empty for the URL itself")
 		}
 	}
 	return nil

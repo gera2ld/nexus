@@ -5,6 +5,7 @@ export type Me = components["schemas"]["Me"];
 export type AppPassword = components["schemas"]["AppPassword"];
 export type Collection = components["schemas"]["Collection"];
 export type StorageAccount = components["schemas"]["StorageAccount"];
+export type StorageType = StorageAccount["type"];
 export type OptionInfo = components["schemas"]["OptionInfo"];
 export type AdminMount = components["schemas"]["AdminMount"];
 export type AdminUser = components["schemas"]["AdminUser"];

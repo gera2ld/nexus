@@ -1,6 +1,6 @@
 import { FolderOpen, Plus, Trash2 } from "lucide-react";
 import { useId, useMemo, useState, type FormEvent } from "react";
-import { api, unwrap, type OptionInfo, type StorageAccount } from "@/api/client";
+import { api, unwrap, type OptionInfo, type StorageAccount, type StorageType as Type } from "@/api/client";
 import { Confirm } from "@/components/Confirm";
 import { Loading, PageHeader } from "@/components/Layout";
 import { Badge } from "@/components/ui/badge";
@@ -13,8 +13,6 @@ import { NativeSelect } from "@/components/ui/native-select";
 import { firstLine, forProvider, typeNames, useAccounts, useStorageOptions } from "@/hooks/admin";
 import { useAction } from "@/hooks/queries";
 import { FolderBrowser } from "./FolderBrowser";
-
-type Type = "local" | "s3";
 
 export function Storage() {
   const list = useAccounts();
@@ -41,7 +39,7 @@ export function Storage() {
       </PageHeader>
       {list.data.length === 0 ? (
         <p className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-          No storage accounts yet. Add a local disk or an S3 account, then give users mounts on it.
+          No storage accounts yet. Add a local disk, an S3 or a WebDAV account, then give users mounts on it.
         </p>
       ) : (
         <div className="grid gap-3">
@@ -220,7 +218,7 @@ function AccountForm({
             <fieldset className="grid gap-2">
               <legend className="mb-2 text-sm font-medium">Type</legend>
               <div className="flex gap-4">
-                {(["s3", "local"] as Type[]).map((t) => (
+                {(["s3", "webdav", "local"] as Type[]).map((t) => (
                   <Label key={t} className="font-normal">
                     <input type="radio" name="type" value={t} checked={type === t} onChange={() => setType(t)} className="accent-primary" />
                     {typeNames[t]}
@@ -232,6 +230,12 @@ function AccountForm({
           {type === "local" && (
             <p className="text-sm text-muted-foreground">
               Local disk needs no settings. Each mount names an absolute folder on the server.
+            </p>
+          )}
+          {type === "webdav" && (
+            <p className="text-sm text-muted-foreground">
+              Each mount names a folder under the URL. For a server run with <code className="font-mono">rclone serve webdav</code>, set
+              vendor to <code className="font-mono">rclone</code> so uploads stream and modification times are kept.
             </p>
           )}
           {options.error && <p className="text-sm text-destructive">{options.error.message}</p>}

@@ -47,7 +47,7 @@ func Options(typ string) ([]OptionInfo, error) {
 	}
 	out := make([]OptionInfo, 0, len(ri.Options))
 	for _, o := range ri.Options {
-		if o.Hide&fs.OptionHideConfigurator != 0 {
+		if o.Hide&fs.OptionHideConfigurator != 0 || isCommand(o.Name) {
 			continue
 		}
 		info := OptionInfo{
@@ -109,7 +109,7 @@ var (
 
 // Browse lists a folder of a storage account: p is a remote path as a mount
 // would use it ("/srv/data" for local disk, "bucket/prefix" for S3, "" for
-// the list of buckets). Folders come first. The second result says the
+// the list of buckets, "folder" or "" under a WebDAV account's URL). Folders come first. The second result says the
 // listing was cut at MaxBrowseEntries.
 func (m *Manager) Browse(ctx context.Context, acc *core.Record, p string) ([]Entry, bool, error) {
 	if err := checkRemotePath(acc.GetString("type"), p); err != nil && p != "" {

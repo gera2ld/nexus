@@ -7,13 +7,13 @@ them.
 - **Calendars and tasks** (CalDAV) for Thunderbird, DAVx⁵ and other apps.
 - **Contacts** (CardDAV).
 - **Files** (WebDAV) for Finder, rclone and other WebDAV clients, stored on
-  local disk or S3. Each user sees the folders the admin gives them.
+  local disk, S3 or another WebDAV server. Each user sees the folders the admin gives them.
 - **App Passwords:** each device gets its own password, limited to
   calendars, contacts or files, and revocable at any time. Users manage
   them on their dashboard.
 - **Files page** at `/files`: browse, upload, rename, move, copy and delete,
   previews, and a code editor for text files.
-- **Admin dashboard** at `/admin` for storage accounts (local disk, S3)
+- **Admin dashboard** at `/admin` for storage accounts (local disk, S3, WebDAV)
   and mounts; users, logs and backups in [PocketBase](https://pocketbase.io)'s
   admin UI.
 

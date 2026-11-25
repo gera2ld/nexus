@@ -126,8 +126,9 @@ didn't block the same client through another; with it, they did.
 3. Calendar and contacts apps: server `https://dav.example.com/`, the
    email, an App Password. Discovery finds the rest.
 4. Files: sign in at `https://dav.example.com/admin` as the superuser.
-   Storage → New storage account (local disk, or S3 with its provider,
-   region, endpoint and keys); Browse checks that it connects. Then Mounts →
+   Storage → New storage account (local disk; S3 with its provider,
+   region, endpoint and keys; or a WebDAV server with its URL, vendor,
+   user and password); Browse checks that it connects. Then Mounts →
    New mount gives a user a folder of it. Users connect to the address the
    dashboard shows,
    `https://dav.example.com/dav/files/{id}/`, with an App Password that has

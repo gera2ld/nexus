@@ -57,20 +57,20 @@ func op(id, method, path, summary string) huma.Operation {
 type StorageAccount struct {
 	ID      string            `json:"id"`
 	Name    string            `json:"name"`
-	Type    string            `json:"type" enum:"local,s3"`
+	Type    string            `json:"type" enum:"local,s3,webdav"`
 	Options map[string]string `json:"options"`
 	Secrets []string          `json:"secrets" doc:"Names of the stored secret options"`
 	Mounts  int               `json:"mounts" doc:"Mounts using this account"`
 }
 
 type typePath struct {
-	Type string `path:"type" enum:"local,s3"`
+	Type string `path:"type" enum:"local,s3,webdav"`
 }
 
 type createAccountInput struct {
 	Body struct {
 		Name    string            `json:"name" minLength:"1" maxLength:"100"`
-		Type    string            `json:"type" enum:"local,s3"`
+		Type    string            `json:"type" enum:"local,s3,webdav"`
 		Options map[string]string `json:"options,omitempty"`
 		Secrets map[string]string `json:"secrets,omitempty" doc:"Secret options, stored encrypted"`
 	}

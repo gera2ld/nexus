@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { api, unwrap } from "@/api/client";
+import { api, unwrap, type StorageType } from "@/api/client";
 
 export const useAccounts = () => useQuery({ queryKey: ["storage-accounts"], queryFn: () => unwrap(api.GET("/admin/storage-accounts")) });
 
@@ -7,7 +7,7 @@ export const useMounts = () => useQuery({ queryKey: ["mounts"], queryFn: () => u
 
 export const useUsers = () => useQuery({ queryKey: ["users"], queryFn: () => unwrap(api.GET("/admin/users")) });
 
-export const useStorageOptions = (type: "local" | "s3") =>
+export const useStorageOptions = (type: StorageType) =>
   useQuery({
     queryKey: ["storage-options", type],
     queryFn: () => unwrap(api.GET("/admin/storage-types/{type}/options", { params: { path: { type } } })),
@@ -30,7 +30,8 @@ export function forProvider(filter: string, provider: string): boolean {
 export const firstLine = (help: string) => help.split("\n")[0].trim();
 
 // Remote paths as mounts use them: absolute for local disk, bucket/prefix
-// for S3 ("" lists the buckets).
+// for S3 ("" lists the buckets), a folder under the URL for WebDAV ("" is
+// the URL itself).
 export function joinPath(type: string, dir: string, name: string) {
   if (type === "local") return dir.endsWith("/") ? dir + name : `${dir}/${name}`;
   return dir ? `${dir}/${name}` : name;
@@ -42,4 +43,4 @@ export function parentPath(type: string, p: string) {
   return i < 0 ? "" : p.slice(0, i);
 }
 
-export const typeNames: Record<string, string> = { local: "Local disk", s3: "S3" };
+export const typeNames: Record<string, string> = { local: "Local disk", s3: "S3", webdav: "WebDAV" };

@@ -21,7 +21,7 @@ own HTTP handlers for the three DAV protocols:
                       │             │                                                    ▼  │
                       │             │                        DAV store ──► SQLite (PocketBase)
                       │             └─► /dav/files/: file handler (x/net/webdav) ─► Storage Manager
-                      │                                                 └─► rclone vfs/fs.Fs ─► S3 / local
+                      │                                                 └─► rclone vfs/fs.Fs ─► S3 / local / WebDAV
                       └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -133,7 +133,7 @@ full on every start with `ImportCollectionsByMarshaledJSON(snapshot, true)`:
 | `addressbooks` | owner, slug, name, description, `sync_seq` | Unique per (owner, slug) |
 | `contacts` | addressbook, href, uid, `vcf`, etag, fn, email, `seq` | |
 | `dav_changes` | collection, href, seq, deleted | Change log and deletion records for sync |
-| `storage_accounts` | name, type (`local` / `s3`), `options` (plain JSON), `secret_options` (write-only input), `secrets_enc` (hidden, AES-256-GCM) | Defined by the admin (§7) |
+| `storage_accounts` | name, type (`local` / `s3` / `webdav`), `options` (plain JSON), `secret_options` (write-only input), `secrets_enc` (hidden, AES-256-GCM) | Defined by the admin (§7) |
 | `mounts` | user, account, name, remote_path, read_only | `/dav/files/{uid}/{name}`; unique per (user, name) |
 
 A default calendar ("Personal") and a default address book ("Contacts") are
@@ -311,11 +311,19 @@ add about 22 MB to the binary.
   bucket) show up once the VFS directory cache expires (1 minute; below).
   Until then their sizes and ETags are the old ones, so `If-Match` can't
   catch them; changes through Nexus are seen at once.
-- **Backends compiled in:** `local` and `s3` only, registered by blank
-  import. Others can be added later by import; `backend/all` would add a lot
-  of size for backends nobody here uses.
+- **Backends compiled in:** `local`, `s3` and `webdav` only, registered by
+  blank import. Others can be added later by import; `backend/all` would add
+  a lot of size for backends nobody here uses.
+- **WebDAV** (added 2026-11-25) is for a folder on another machine, served
+  by `rclone serve webdav` over a private network such as NetBird, so the
+  files stay plain files there and the other machine shares only that
+  folder. Vendor `rclone` is the one to use with it: rclone then streams
+  uploads (other vendors spool each upload to a temp file first) and keeps
+  modification times to the second. It has no hashes, so ETags are
+  modification time plus size. Tested against `x/net/webdav` behind basic
+  auth; not yet against a real `rclone serve webdav`.
 - **Storage accounts** (`storage_accounts`, superuser-only):
-  - `type`: `local` or `s3`.
+  - `type`: `local`, `s3` or `webdav`.
   - `options`: plain JSON object of rclone backend options
     (`{"provider": "AWS", "region": "eu-central-1"}`), visible in the
     dashboard.
@@ -325,7 +333,10 @@ add about 22 MB to the binary.
     it blank keeps the stored secrets; entering a new object replaces them.
   - Save-time checks: every key must be an option of that backend; sensitive
     options are refused in `options` (so secrets can't land in plain text);
-    non-sensitive ones are refused in `secret_options`.
+    non-sensitive ones are refused in `secret_options`. Options that run a
+    program (names ending in `_command`, like WebDAV's
+    `bearer_token_command`) are refused and not offered, so storage
+    settings can't run commands on the server.
   - Encryption: AES-256-GCM with a 32-byte key from `NEXUS_ENC_KEY`
     (base64). Saving secrets without the key fails with a clear error; so
     does opening a mount whose account has secrets.
@@ -334,7 +345,8 @@ add about 22 MB to the binary.
   the URL segment), `remote_path` (the root within the account: an absolute
   directory for `local`; `bucket` or `bucket/prefix` for `s3`, or empty for
   every bucket the credentials can list, where top-level folders are
-  buckets and creating or deleting one creates or deletes a bucket),
+  buckets and creating or deleting one creates or deletes a bucket; a
+  folder under the URL for `webdav`, or empty for the URL itself),
   `read_only`.
 - **Storage manager** (`internal/storage`): maps (user, mount name) to a
   cached `vfs.VFS` built from the account's type, options and decrypted

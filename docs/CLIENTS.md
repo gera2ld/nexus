@@ -70,6 +70,9 @@ read-only mount and the top level give "Operation not permitted".
   2026-11-23 Nexus didn't pass rclone's defaults, so S3 accounts couldn't
   open ("chunk size: 0 is less than 5Mi"); the admin dashboard's Browse
   button is the quickest check after deploying.
+- **WebDAV storage** is tested against `x/net/webdav` behind basic auth,
+  not yet against a real `rclone serve webdav`; Browse on the account is
+  the first check.
 
 ## Checking a client
 

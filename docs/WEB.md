@@ -121,11 +121,15 @@ the admin UI, so its change log goes with it.
     write-only field that is never shown again; other rclone options under
     "Advanced" as key/value pairs. The server's existing save hook still
     validates every option against rclone and encrypts the secrets.
+  - WebDAV: URL, vendor, and the user and password as write-only fields
+    (rclone marks both sensitive). The form suggests vendor `rclone` for
+    `rclone serve webdav`.
   - **Test connection:** lists the top of the account (or a path in it)
     and shows rclone's error if that fails.
 - **Mounts:** per user: account, name, remote path, read-only. A remote
   path picker uses the same listing as the connection test. For S3 the
-  path may be empty (all buckets), shown as "all buckets" in the list.
+  path may be empty (all buckets), shown as "all buckets" in the list; for
+  WebDAV it may be empty too (the account's URL itself).
 - Users, logs and backups stay in the PocketBase admin UI (`/_/`), linked
   from the dashboard.
 - **The settings form comes from rclone:** the account's main options for

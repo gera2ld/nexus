@@ -195,14 +195,19 @@ function MountForm({ mount, onClose }: { mount?: AdminMount; onClose: () => void
                   id="m-path"
                   value={remotePath}
                   onChange={(e) => setRemotePath(e.target.value)}
-                  required={account?.type !== "s3"}
+                  required={account?.type === "local"}
                   className="font-mono"
-                  placeholder={account?.type === "s3" ? "All buckets" : "/srv/nexus/ada"}
+                  placeholder={account?.type === "s3" ? "All buckets" : account?.type === "webdav" ? "The whole URL" : "/srv/nexus/ada"}
                 />
                 <Button type="button" variant="outline" disabled={!account} onClick={() => setPicking(true)}>
                   <FolderOpen /> Browse
                 </Button>
               </div>
+              {account?.type === "webdav" && (
+                <p className="text-xs text-muted-foreground">
+                  A folder under the account's URL, like photos/2026. Empty mounts the URL itself.
+                </p>
+              )}
               {account?.type === "s3" && (
                 <p className="text-xs text-muted-foreground">
                   bucket or bucket/prefix. Empty shows every bucket the account can list, and folders at the top are buckets: creating or

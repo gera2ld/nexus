@@ -249,7 +249,8 @@
           "type": {
             "enum": [
               "local",
-              "s3"
+              "s3",
+              "webdav"
             ],
             "type": "string"
           }
@@ -718,7 +719,8 @@
           "type": {
             "enum": [
               "local",
-              "s3"
+              "s3",
+              "webdav"
             ],
             "type": "string"
           }
@@ -1571,7 +1573,8 @@
             "schema": {
               "enum": [
                 "local",
-                "s3"
+                "s3",
+                "webdav"
               ],
               "type": "string"
             }

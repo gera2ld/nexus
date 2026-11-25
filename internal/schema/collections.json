@@ -1176,7 +1176,8 @@
         "type": "select",
         "values": [
           "local",
-          "s3"
+          "s3",
+          "webdav"
         ]
       },
       {

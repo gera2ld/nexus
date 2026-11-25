@@ -45,7 +45,11 @@ export function FolderBrowser(props: {
         <DialogHeader>
           <DialogTitle>{props.onPick ? "Choose a folder" : `Browse ${account.name}`}</DialogTitle>
           <DialogDescription>
-            {account.type === "s3" ? "Paths are bucket/prefix. The top lists your buckets." : "Paths are absolute folders on the server."}
+            {account.type === "s3"
+              ? "Paths are bucket/prefix. The top lists your buckets."
+              : account.type === "webdav"
+                ? "Paths are folders under the account's URL. The top is the URL itself."
+                : "Paths are absolute folders on the server."}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="flex gap-2">
@@ -64,7 +68,7 @@ export function FolderBrowser(props: {
             onChange={(e) => setTyped(e.target.value)}
             className="font-mono"
             aria-label="Path"
-            placeholder={account.type === "s3" ? "bucket/prefix" : "/"}
+            placeholder={account.type === "s3" ? "bucket/prefix" : account.type === "webdav" ? "folder" : "/"}
           />
           <Button type="submit" variant="outline">
             Go

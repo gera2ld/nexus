@@ -15,6 +15,7 @@ import (
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
 	_ "github.com/rclone/rclone/backend/local" // the backends Nexus offers
 	_ "github.com/rclone/rclone/backend/s3"
+	_ "github.com/rclone/rclone/backend/webdav"
 	"github.com/rclone/rclone/fs"
 	"github.com/rclone/rclone/fs/config/configmap"
 	"github.com/rclone/rclone/fs/config/obscure"
