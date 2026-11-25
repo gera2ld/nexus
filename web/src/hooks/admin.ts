@@ -43,4 +43,4 @@ export function parentPath(type: string, p: string) {
   return i < 0 ? "" : p.slice(0, i);
 }
 
-export const typeNames: Record<string, string> = { local: "Local disk", s3: "S3", webdav: "WebDAV" };
+export { typeNames } from "@/lib/storage";

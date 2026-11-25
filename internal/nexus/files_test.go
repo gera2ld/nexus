@@ -273,7 +273,7 @@ func TestFilesMountChangesApply(t *testing.T) {
 		t.Errorf("after deleting the mount: %d, want 404", r.code)
 	}
 	r := f.do("GET", "/api/nexus/me", nil, bearer(f.userTok))
-	if !strings.Contains(r.body, `"mounts":[{"name":"archive","readOnly":true},{"name":"scratch","readOnly":false}]`) {
+	if !strings.Contains(r.body, `"mounts":[{"name":"archive","readOnly":true,"type":"local"},{"name":"scratch","readOnly":false,"type":"local"}]`) {
 		t.Errorf("/me mounts: %s", r.body)
 	}
 }

@@ -177,7 +177,7 @@ func TestAdminBrowseAndMounts(t *testing.T) {
 		t.Fatalf("PATCH mount: %s", r.body)
 	}
 	me := decode[account.Me](t, s.do("GET", "/api/nexus/me", nil, bearer(userTok)))
-	if len(me.Mounts) != 1 || me.Mounts[0].Name != "papers" || !me.Mounts[0].ReadOnly {
+	if len(me.Mounts) != 1 || me.Mounts[0].Name != "papers" || !me.Mounts[0].ReadOnly || me.Mounts[0].Type != "local" {
 		t.Errorf("the user's view: %+v", me.Mounts)
 	}
 	if list := decode[[]admin.AdminMount](t, api("GET", "/mounts", nil)); len(list) != 1 {

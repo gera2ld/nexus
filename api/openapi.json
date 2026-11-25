@@ -597,11 +597,21 @@
           },
           "readOnly": {
             "type": "boolean"
+          },
+          "type": {
+            "description": "The storage account's type, for the mount's icon",
+            "enum": [
+              "local",
+              "s3",
+              "webdav"
+            ],
+            "type": "string"
           }
         },
         "required": [
           "name",
-          "readOnly"
+          "readOnly",
+          "type"
         ],
         "type": "object"
       },

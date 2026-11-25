@@ -8,7 +8,6 @@ import {
   Folder,
   FolderInput,
   FolderPlus,
-  HardDrive,
   MoreHorizontal,
   Pencil,
   Trash2,
@@ -20,6 +19,7 @@ import { Link, useParams } from "react-router";
 import { toast } from "sonner";
 import { badName, list, mkcol, mountOf, parentOf, rawPath, remove, setUser, transfer, upload, type Entry } from "@/api/dav";
 import { Confirm } from "@/components/Confirm";
+import { MountIcon } from "@/lib/storage";
 import { Loading, NotFound } from "@/components/Layout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -100,7 +100,8 @@ function TreeNode({ entry, current, depth }: { entry: Entry; current: string; de
   const q = useListing(entry.path, open);
   const dirs = q.data?.filter((e) => e.dir) ?? [];
   const link = useFilesLink();
-  const Icon = depth === 0 ? HardDrive : Folder;
+  const me = useMe();
+  const type = me.data?.mounts.find((m) => m.name === entry.name)?.type;
   return (
     <li>
       <div
@@ -117,7 +118,11 @@ function TreeNode({ entry, current, depth }: { entry: Entry; current: string; de
           <ChevronRight className={cn("size-3.5 transition-transform", open && "rotate-90")} />
         </button>
         <Link to={link(entry.path)} className="flex min-w-0 flex-1 items-center gap-1.5 py-1 pr-2">
-          <Icon className="size-4 shrink-0 text-muted-foreground" />
+          {depth === 0 ? (
+            <MountIcon type={type} className="size-4 shrink-0 text-muted-foreground" />
+          ) : (
+            <Folder className="size-4 shrink-0 text-muted-foreground" />
+          )}
           <span className="truncate">{entry.name}</span>
         </Link>
       </div>
@@ -331,7 +336,7 @@ export function FolderView({ path }: { path: string }) {
                   <TableCell className="max-w-0">
                     <Link to={link(e.path)} className="flex min-w-0 items-center gap-2 hover:underline">
                       {top ? (
-                        <HardDrive className="size-4 shrink-0 text-muted-foreground" />
+                        <MountIcon type={mountInfo(e.name)?.type} className="size-4 shrink-0 text-muted-foreground" />
                       ) : e.dir ? (
                         <Folder className="size-4 shrink-0 text-muted-foreground" />
                       ) : (
@@ -670,7 +675,10 @@ function DestinationDialog(props: {
                       onClick={() => setAt(e.path)}
                     >
                       {at === "/" ? (
-                        <HardDrive className="size-4 shrink-0 text-muted-foreground" />
+                        <MountIcon
+                          type={me.data?.mounts.find((m) => m.name === e.name)?.type}
+                          className="size-4 shrink-0 text-muted-foreground"
+                        />
                       ) : (
                         <Folder className="size-4 shrink-0 text-muted-foreground" />
                       )}

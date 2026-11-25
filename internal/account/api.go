@@ -99,6 +99,7 @@ func Register(r *router.Router[*core.RequestEvent], app core.App, st *store.Stor
 type Mount struct {
 	Name     string `json:"name"`
 	ReadOnly bool   `json:"readOnly"`
+	Type     string `json:"type" enum:"local,s3,webdav" doc:"The storage account's type, for the mount's icon"`
 }
 
 type Me struct {
@@ -192,9 +193,18 @@ func (h *handlers) me(ctx context.Context, _ *struct{}) (*body[Me], error) {
 	if err != nil {
 		return nil, err
 	}
+	if errs := h.app.ExpandRecords(recs, []string{"account"}, nil); len(errs) > 0 {
+		for _, err := range errs {
+			return nil, err
+		}
+	}
 	mounts := make([]Mount, 0, len(recs))
 	for _, r := range recs {
-		mounts = append(mounts, Mount{r.GetString("name"), r.GetBool("read_only")})
+		m := Mount{Name: r.GetString("name"), ReadOnly: r.GetBool("read_only")}
+		if a := r.ExpandedOne("account"); a != nil {
+			m.Type = a.GetString("type")
+		}
+		mounts = append(mounts, m)
 	}
 	return &body[Me]{Me{ID: c.user.Id, Email: c.user.Email(), Server: requestOrigin(c.req), Mounts: mounts}}, nil
 }

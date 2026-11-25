@@ -100,7 +100,7 @@ are RFC 9457 problem documents; validation errors are 422.
 
 | Method and path | Does |
 |---|---|
-| `GET /me` | user, server addresses, mounts (exists) |
+| `GET /me` | user, server addresses, mounts (name, read-only, storage type) |
 | `GET, POST /app-passwords` | list, create (exists) |
 | `PATCH /app-passwords/{id}` | change label, scopes, paths |
 | `POST /app-passwords/{id}/revoke` | revoke (exists) |
@@ -158,7 +158,8 @@ encryption stay in `internal/storage`:
 ### 6.1 File browser
 
 - A tree of mounts and folders on the left, the folder or file on the
-  right. Read-only mounts show no write actions.
+  right. Read-only mounts show no write actions. Each mount's icon shows its
+  storage type: a drive for local disk, a cloud for S3, a server for WebDAV.
 - Create folders; rename, move, copy and delete (with multi-select);
   upload files by picking or dropping them. Uploads are one `PUT` per file,
   with progress; there are no resumable or folder uploads yet.
